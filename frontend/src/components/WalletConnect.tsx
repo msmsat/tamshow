@@ -1,8 +1,8 @@
 import { Wallet } from 'lucide-react';
-import { useStore } from '../store/useStore';
+import { useUserStore } from '../store/useUserStore';
 
 export function WalletConnect() {
-  const { walletAddress, connectWallet, disconnectWallet } = useStore();
+  const { walletAddress, connectWallet, disconnectWallet } = useUserStore();
 
   const handleConnect = async () => {
     // Симуляция подключения кошелька

@@ -2,15 +2,18 @@ import { motion } from 'framer-motion';
 import { ShoppingBag, Zap, ChevronRight } from 'lucide-react';
 import { WalletConnect } from '../components/WalletConnect';
 import { ProductCard } from '../components/ProductCard';
-import { useStore, type Product } from '../store/useStore';
+import { useUserStore } from '../store/useUserStore';
+import { useUIStore } from '../store/useUIStore';
+import type { Product } from '../store/types';
 
 const FEATURED_PRODUCTS: Product[] = [
-  { id: '1', image: '👕', title: 'Nexus Hoodie', price: 4999, description: 'Limited edition cyberpunk merch', category: 'merch' },
-  { id: '2', image: '🎁', title: 'VIP Pass', price: 9999, description: '12-month exclusive access', category: 'subscription' },
+  { id: '1', image: '/sweater.webp', title: 'Nexus Hoodie', price: 4999, description: 'Limited edition cyberpunk merch', category: 'merch' },
+  { id: '2', image: '/pass.webp', title: 'VIP Pass', price: 9999, description: '12-month exclusive access', category: 'subscription' },
 ];
 
 export function Home({ onTabChange }: { onTabChange?: (tab: string) => void }) {
-  const { isVip, selectProduct } = useStore();
+  const { isVip } = useUserStore();
+  const { selectProduct } = useUIStore();
 
   return (
     <div style={{

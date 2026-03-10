@@ -1,14 +1,16 @@
 import { Plus, Check, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useStore, type Product } from '../store/useStore';
+import { useUserStore } from '../store/useUserStore';
+import { useCartStore } from '../store/useCartStore';
+import type { Product } from '../store/types';
 
 interface ProductCardProps extends Product {
-  category?: 'merch' | 'subscription';
   onClick?: () => void;
 }
 
-export function ProductCard({ id, image, title, price, description, category = 'merch', onClick }: ProductCardProps) {
-  const { isVip, addToCart, removeFromCart, isInCart } = useStore();
+export function ProductCard({ id, image, title, price, description, category, onClick }: ProductCardProps) {
+  const { isVip } = useUserStore();
+  const { addToCart, removeFromCart, isInCart } = useCartStore();
   const inCart = isInCart(id);
   
   // Расчет финальной цены с VIP скидкой
@@ -50,15 +52,28 @@ export function ProductCard({ id, image, title, price, description, category = '
       {/* Изображение */}
       <div style={{
         width: '100%',
-        height: '120px',
+        aspectRatio: '1',
         backgroundColor: 'rgba(168, 85, 247, 0.1)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         fontSize: '48px',
-        color: '#a855f7'
+        color: '#a855f7',
+        overflow: 'hidden'
       }}>
-        {image}
+        {image.startsWith('/') || image.startsWith('http') ? (
+          <img 
+            src={image} 
+            alt={title}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover'
+            }}
+          />
+        ) : (
+          image
+        )}
       </div>
 
       {/* Информация */}

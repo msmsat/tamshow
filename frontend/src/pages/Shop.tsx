@@ -1,15 +1,17 @@
-import { Search, ChevronDown } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useState } from 'react';
 import { ProductCard } from '../components/ProductCard';
-import { useStore, type Product } from '../store/useStore';
+import { useUserStore } from '../store/useUserStore';
+import { useUIStore } from '../store/useUIStore';
+import type { Product } from '../store/types';
 
 const ALL_PRODUCTS: Product[] = [
-  { id: '1', image: '👕', title: 'Nexus Hoodie', price: 4999, description: 'Limited edition cyberpunk merch', category: 'merch' },
-  { id: '2', image: '🎁', title: 'VIP Pass', price: 9999, description: '12-month exclusive access', category: 'subscription' },
-  { id: '3', image: '🧢', title: 'Purple Cap', price: 2999, description: 'Classic snapback with logo', category: 'merch' },
-  { id: '4', image: '📱', title: 'NFT Blueprint', price: 14999, description: 'Exclusive digital asset', category: 'subscription' },
-  { id: '5', image: '⌚', title: 'Cyber Watch', price: 7999, description: 'Smartwatch edition', category: 'merch' },
-  { id: '6', image: '🎪', title: 'Event Pass', price: 5999, description: 'Access to live events', category: 'subscription' },
+  { id: '1', image: '/sweater.webp', title: 'Nexus Hoodie', price: 4999, description: 'Limited edition cyberpunk merch', category: 'merch' },
+  { id: '2', image: '/pass.webp', title: 'VIP Pass', price: 9999, description: '12-month exclusive access', category: 'subscription' },
+  { id: '3', image: '/cap.webp', title: 'Purple Cap', price: 2999, description: 'Classic snapback with logo', category: 'merch' },
+  { id: '4', image: '/nft.webp', title: 'NFT Blueprint', price: 14999, description: 'Exclusive digital asset', category: 'subscription' },
+  { id: '5', image: '/sneakers.webp', title: 'Cyber Sneakers', price: 7999, description: 'High-tech footwear edition', category: 'merch' },
+  { id: '6', image: '/jacket.webp', title: 'Nexus Jacket', price: 5999, description: 'Premium urban collection', category: 'merch' },
 ];
 
 type FilterType = 'all' | 'merch' | 'subscription';
@@ -17,7 +19,8 @@ type FilterType = 'all' | 'merch' | 'subscription';
 export function Shop() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
-  const { isVip, selectProduct } = useStore();
+  const { isVip } = useUserStore();
+  const { selectProduct } = useUIStore();
 
   // Фильтрация товаров
   const filteredProducts = ALL_PRODUCTS.filter(product => {

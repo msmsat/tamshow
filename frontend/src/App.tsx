@@ -4,9 +4,12 @@ import { motion } from 'framer-motion';
 import { Home as HomeIcon, ShoppingBag, MessageSquare, ShoppingCart, User } from 'lucide-react';
 import { Home } from './pages/Home';
 import { Shop } from './pages/Shop';
-import { ProductDetails } from './pages/ProductDetails';
+import { ProductDetailsModal } from './components/ProductDetailsModal';
 import { AiChat } from './pages/AiChat';
-import { useStore } from './store/useStore';
+import { Cart, CheckoutFooter } from './pages/Cart';
+import { Profile } from './pages/Profile';
+import { useUIStore } from './store/useUIStore';
+import { useCartStore } from './store/useCartStore';
 
 // Список наших вкладок
 const TABS = [
@@ -19,7 +22,8 @@ const TABS = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
-  const { selectedProductId } = useStore();
+  const { selectedProductId, selectProduct } = useUIStore();
+  const { cart } = useCartStore();
 
   return (
     // Главный экран: жестко фиксируем 100vh, чтобы не было системного скролла!
@@ -31,29 +35,54 @@ export default function App() {
       backgroundColor: '#0a0a0a', // Очень темный фон сайта
       color: '#ffffff',
       fontFamily: 'system-ui, sans-serif',
-      overflow: 'hidden' // Блокируем скролл всей страницы
+      overflow: 'hidden', // Блокируем скролл всей страницы
+      position: 'relative'
     }}>
+      {/* Modal Backdrop и Window - ПОВЕРХУ всего */}
+      {selectedProductId && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => selectProduct(null)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              zIndex: 99
+            }}
+          />
+          <ProductDetailsModal productId={selectedProductId} />
+        </>
+      )}
       
       {/* КОНТЕНТ (Сюда будут грузиться страницы) */}
       <div style={{ 
         flex: 1, 
-        overflowY: 'auto', // Скролл только вниз
-        overflowX: 'hidden', // Блокируем скролл вправо
+        overflowY: selectedProductId ? 'hidden' : 'auto',
+        overflowX: 'hidden',
         padding: '0px',
         paddingBottom: '0px'
       }}>
-        {selectedProductId ? (
-          <ProductDetails productId={selectedProductId} />
-        ) : (
+        {!selectedProductId && (
           <>
             {activeTab === 'home' && <Home onTabChange={setActiveTab} />}
             {activeTab === 'shop' && <Shop />}
             {activeTab === 'chat' && <AiChat />}
-            {activeTab === 'cart' && <div style={{ color: '#9ca3af', padding: '20px' }}>Cart coming soon...</div>}
-            {activeTab === 'profile' && <div style={{ color: '#9ca3af', padding: '20px' }}>Profile coming soon...</div>}
+            {activeTab === 'cart' && <Cart />}
+            {activeTab === 'profile' && <Profile />}
           </>
         )}
       </div>
+
+      {/* Checkout Footer - Показывается только в Cart если есть товары */}
+      {activeTab === 'cart' && !selectedProductId && cart.length > 0 && <CheckoutFooter />}
 
       {/* 📱 BOTTOM BAR (Тот самый киберпанк) */}
       <div style={{
