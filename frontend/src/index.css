@@ -8,6 +8,23 @@ html, body, #root {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Скрыть скроллбар во всех браузерах */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Скроллбар для элементов с overflow */
+div {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+div::-webkit-scrollbar {
+  display: none;
 }
 
 @keyframes pulse {

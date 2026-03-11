@@ -264,6 +264,10 @@ export function Home({ onTabChange }: { onTabChange?: (tab: string) => void }) {
               transition: 'color 0.2s',
               cursor: 'pointer'
             }}
+            onClick={(e) => {
+              e.preventDefault();
+              onTabChange?.('shop');
+            }}
             onMouseEnter={(e) => {
               e.currentTarget.style.color = '#d8b4fe';
             }}

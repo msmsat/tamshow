@@ -177,7 +177,7 @@ export function AiChat() {
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
-        paddingBottom: '100px'
+        paddingBottom: '160px'
       }}>
         {messages.map(message => (
           <motion.div
@@ -253,11 +253,11 @@ export function AiChat() {
       {/* Input Area */}
       <div style={{
         position: 'fixed',
-        bottom: '80px',
+        bottom: '64px',
         left: '0',
         right: '0',
-        padding: '12px 16px',
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        padding: '16px 16px 22px 16px',
+        backgroundColor: 'transparent',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         borderTop: '1px solid rgba(255, 255, 255, 0.05)',

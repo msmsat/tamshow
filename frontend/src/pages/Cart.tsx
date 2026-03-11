@@ -1,9 +1,11 @@
 import { ShoppingBag, Minus, Trash2, Plus, Zap, ShieldCheck, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useState } from 'react';
 import { useUserStore } from '../store/useUserStore';
 import { useCartStore } from '../store/useCartStore';
+import { WalletConnect } from '../components/WalletConnect';
 
-export function Cart() {
+export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { isVip } = useUserStore();
   const { cart, removeFromCart, updateQuantity: updateCartQuantity } = useCartStore();
 
@@ -78,7 +80,7 @@ export function Cart() {
           marginBottom: '12px',
           letterSpacing: '-0.5px'
         }}>
-          Data Void Detected
+          Your cart is empty
         </h2>
 
         <p style={{
@@ -106,6 +108,7 @@ export function Cart() {
             cursor: 'pointer',
             transition: 'all 0.3s ease'
           }}
+          onClick={() => onTabChange?.('shop')}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = 'rgba(6, 182, 212, 0.15)';
             e.currentTarget.style.boxShadow = '0 0 20px rgba(6, 182, 212, 0.3)';
@@ -115,7 +118,7 @@ export function Cart() {
             e.currentTarget.style.boxShadow = 'none';
           }}
         >
-          Explore Databanks
+          Start Shopping
         </motion.button>
       </div>
     );
@@ -410,28 +413,10 @@ export function Cart() {
               }}>
                 Connect your Web3 wallet and hold Nexus NFT to instantly save ${discount} on this loadout.
               </p>
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                style={{
-                  background: 'none',
-                  border: '1px solid rgba(217, 119, 6, 0.5)',
-                  borderRadius: '8px',
-                  padding: '8px 16px',
-                  color: '#fbbf24',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(217, 119, 6, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                Connect Wallet
-              </motion.button>
+              <div style={{ marginTop: '12px' }}>
+                <WalletConnect color="#fbbf24" borderColor="1px solid rgba(217, 119, 6, 0.5)"
+                mouseEnterColor='rgba(217, 119, 6, 0.1)' mouseLeaveColor='transparent' mouseEnterBorderColor='rgba(217, 119, 6, 0.5)' mouseLeaveBorderColor='rgba(217, 119, 6, 0.3)' />
+              </div>
             </div>
           </div>
         </motion.div>
@@ -442,6 +427,7 @@ export function Cart() {
 
 // Sticky Checkout Footer Component
 export function CheckoutFooter() {
+  const [isExpanded, setIsExpanded] = useState(false);
   const { isVip } = useUserStore();
   const { cart } = useCartStore();
 
@@ -452,138 +438,150 @@ export function CheckoutFooter() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      // МАГИЯ ПЛАВНОСТИ: layout заставляет контейнер плавно менять размер
+      layout
+      transition={{ duration: 0.4, ease: "easeInOut" }} // Вот здесь настраивается скорость (0.4 секунды)
       style={{
         position: 'fixed',
-        bottom: '80px',
+        bottom: '64px',
         left: '0',
         right: '0',
         paddingLeft: '16px',
         paddingRight: '16px',
-        paddingTop: '20px',
+        paddingTop: '5px',
         paddingBottom: '20px',
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        backgroundColor: 'rgba(10, 10, 10, 0.85)',
         backdropFilter: 'blur(32px)',
         WebkitBackdropFilter: 'blur(32px)',
-        borderTop: '1px solid rgba(168, 85, 247, 0.3)',
+        borderTop: '1px solid rgba(168, 85, 247, 0.4)',
         borderTopLeftRadius: '24px',
         borderTopRightRadius: '24px',
-        zIndex: 40
-      }}
-    >
-      {/* Checkout Tape - Order Summary */}
-      <div style={{
-        marginBottom: '16px',
+        zIndex: 40,
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px'
-      }}>
-        {/* Subtotal */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: '12px'
-        }}>
-          <span style={{ color: '#9ca3af' }}>Subtotal</span>
-          <span style={{ color: '#d1d5db', fontWeight: 600 }}>${subtotal}</span>
-        </div>
-
-        {/* Network Fee */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: '12px'
-        }}>
-          <span style={{ color: '#9ca3af' }}>Network Fee</span>
-          <span style={{ color: '#d1d5db', fontWeight: 600 }}>${networkFee}</span>
-        </div>
-
-        {/* VIP Discount */}
-        {discount > 0 && (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: '12px'
-          }}>
-            <span style={{ color: '#22c55e' }}>VIP Discount</span>
-            <span style={{ color: '#22c55e', fontWeight: 600 }}>-${discount}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Divider */}
-      <div style={{
-        height: '1px',
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        marginBottom: '12px'
-      }} />
-
-      {/* Total */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '16px'
-      }}>
-        <span style={{
-          fontSize: '14px',
-          fontWeight: 700,
-          color: '#ffffff',
-          letterSpacing: '0.5px'
-        }}>
-          TOTAL
-        </span>
-        <span style={{
-          fontSize: '28px',
-          fontWeight: 'black',
-          backgroundImage: 'linear-gradient(to right, #a855f7, #06b6d4)',
-          backgroundClip: 'text',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent'
-        }}>
-          ${total}
-        </span>
-      </div>
-
-      {/* Checkout Button - Initialize Checkout */}
-      <motion.button
-        whileTap={{ scale: 0.95 }}
+        overflow: 'hidden' // Важно: обрезает контент при закрытии
+      }}
+    >
+      {/* 1. Зона Клика (Анимированная цельная SVG-линия) */}
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
         style={{
-          width: '100%',
-          height: '56px',
-          backgroundImage: 'linear-gradient(to right, rgba(168, 85, 247, 0.9), rgba(59, 130, 246, 0.9))',
-          border: 'none',
-          borderRadius: '12px',
-          color: '#ffffff',
-          fontSize: '14px',
-          fontWeight: 700,
-          cursor: 'pointer',
-          boxShadow: '0 0 20px rgba(168, 85, 247, 0.4)',
           display: 'flex',
-          alignItems: 'center',
           justifyContent: 'center',
-          gap: '10px',
-          transition: 'all 0.3s ease',
-          letterSpacing: '0.5px'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = '0 0 40px rgba(168, 85, 247, 0.6)';
-          e.currentTarget.style.backgroundImage = 'linear-gradient(to right, rgba(168, 85, 247, 1), rgba(59, 130, 246, 1))';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = '0 0 20px rgba(168, 85, 247, 0.4)';
-          e.currentTarget.style.backgroundImage = 'linear-gradient(to right, rgba(168, 85, 247, 0.9), rgba(59, 130, 246, 0.9))';
+          alignItems: 'center',
+          width: '100%',
+          height: '32px',
+          cursor: 'pointer',
+          marginBottom: '8px'
         }}
       >
-        <span>Initialize Checkout</span>
-        <motion.div
-          animate={{ x: [0, 4, 0] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+        <svg 
+          width="40" 
+          height="11" 
+          viewBox="0 0 40 15" 
+          fill="none" 
+          xmlns="http://www.w3.org/2000/svg"
         >
-          <ArrowRight size={16} />
-        </motion.div>
-      </motion.button>
+          <motion.path
+            // d - это координаты линии. 
+            // M - начало (Move to), L - линия до (Line to).
+            // Закрыто (^): От левого низа -> в центр наверх -> в правый низ
+            // Открыто (v): От левого верха -> в центр вниз -> в правый верх
+            animate={{ 
+              d: isExpanded 
+                ? "M 2 2 L 20 12 L 38 2" 
+                : "M 2 12 L 20 2 L 38 12",
+              stroke: isExpanded ? "#9ca3af" : "#6b7280"
+            }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            strokeWidth="4" // Толщина линии (как у наших палок)
+            strokeLinecap="round" // Закругляет концы линии
+            strokeLinejoin="round" // МАГИЯ: Делает угол сгиба идеально круглым и цельным!
+            initial={false}
+          />
+        </svg>
+      </div>
+
+      {/* 2. Скрытый Чек (Всегда существует, но сжимается до нуля) */}
+      <motion.div
+        initial={false}
+        animate={{ 
+          height: isExpanded ? 'auto' : 0,
+          opacity: isExpanded ? 1 : 0 
+        }}
+        // Магическая формула плавности (Cubic Bezier) как в Apple
+        transition={{ 
+          duration: 0.4, 
+          ease: [0.25, 1, 0.5, 1] 
+        }}
+        style={{ 
+          overflow: 'hidden', // Обязательно: обрезает контент, пока высота 0
+          willChange: 'height, opacity' // Подсказка браузеру: заранее включи видеокарту для этого блока
+        }}
+      >
+        <div style={{ 
+          paddingBottom: '16px', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '8px' 
+        }}>
+          {/* Subtotal */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+            <span style={{ color: '#9ca3af' }}>Subtotal</span>
+            <span style={{ color: '#d1d5db', fontWeight: 600 }}>${subtotal}</span>
+          </div>
+          
+          {/* Network Fee */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+            <span style={{ color: '#9ca3af' }}>Network Fee</span>
+            <span style={{ color: '#d1d5db', fontWeight: 600 }}>${networkFee}</span>
+          </div>
+          
+          {/* VIP Discount */}
+          {discount > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+              <span style={{ color: '#22c55e' }}>VIP Discount</span>
+              <span style={{ color: '#22c55e', fontWeight: 600 }}>-${discount}</span>
+            </div>
+          )}
+          
+          <div style={{ height: '1px', backgroundColor: 'rgba(255, 255, 255, 0.1)', margin: '8px 0' }} />
+        </div>
+      </motion.div>
+
+      {/* 3. Итоговая цена и кнопка (Видны всегда) */}
+      <motion.div layout style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px' }}>
+            TOTAL
+          </span>
+          <span style={{
+            fontSize: '24px', fontWeight: 'black',
+            backgroundImage: 'linear-gradient(to right, #a855f7, #06b6d4)',
+            backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
+          }}>
+            ${total}
+          </span>
+        </div>
+
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => {
+             if (!isExpanded) setIsExpanded(true); // Если закрыто - при клике на кнопку открываем чек
+          }}
+          style={{
+            flex: 1, height: '48px',
+            backgroundImage: 'linear-gradient(to right, rgba(168, 85, 247, 0.9), rgba(59, 130, 246, 0.9))',
+            border: 'none', borderRadius: '12px', color: '#ffffff',
+            fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+            boxShadow: '0 0 20px rgba(168, 85, 247, 0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+          }}
+        >
+          <span>Checkout</span>
+          <ArrowRight size={14} />
+        </motion.button>
+      </motion.div>
     </motion.div>
   );
 }

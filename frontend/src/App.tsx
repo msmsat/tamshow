@@ -70,15 +70,13 @@ export default function App() {
         padding: '0px',
         paddingBottom: '0px'
       }}>
-        {!selectedProductId && (
-          <>
-            {activeTab === 'home' && <Home onTabChange={setActiveTab} />}
-            {activeTab === 'shop' && <Shop />}
-            {activeTab === 'chat' && <AiChat />}
-            {activeTab === 'cart' && <Cart />}
-            {activeTab === 'profile' && <Profile />}
-          </>
-        )}
+        <>
+          {activeTab === 'home' && <Home onTabChange={setActiveTab} />}
+          {activeTab === 'shop' && <Shop />}
+          {activeTab === 'chat' && <AiChat />}
+          {activeTab === 'cart' && <Cart onTabChange={setActiveTab} />}
+          {activeTab === 'profile' && <Profile />}
+        </>
       </div>
 
       {/* Checkout Footer - Показывается только в Cart если есть товары */}

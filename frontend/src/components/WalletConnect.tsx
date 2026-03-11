@@ -1,7 +1,16 @@
 import { Wallet } from 'lucide-react';
 import { useUserStore } from '../store/useUserStore';
 
-export function WalletConnect() {
+interface WalletConnectProps {
+  color?: string; // Значок "?" означает, что цвет можно не передавать
+  borderColor?: string;
+  mouseEnterColor?: string;
+  mouseLeaveColor?: string;
+  mouseEnterBorderColor?: string;
+  mouseLeaveBorderColor?: string;
+}
+
+export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 247, 0.3)', mouseEnterColor = 'rgba(168, 85, 247, 0.5)', mouseLeaveColor = 'rgba(168, 85, 247, 0.3)', mouseEnterBorderColor = 'rgba(168, 85, 247, 0.5)', mouseLeaveBorderColor = 'rgba(168, 85, 247, 0.3)' }: WalletConnectProps) {
   const { walletAddress, connectWallet, disconnectWallet } = useUserStore();
 
   const handleConnect = async () => {
@@ -60,22 +69,22 @@ export function WalletConnect() {
         alignItems: 'center',
         gap: '6px',
         backgroundColor: 'transparent',
-        border: '1px solid rgba(168, 85, 247, 0.3)',
+        border: borderColor,
         borderRadius: '8px',
         padding: '8px 12px',
-        color: '#c084fc',
+        color: color,
         fontSize: '12px',
         fontWeight: 500,
         cursor: 'pointer',
         transition: 'all 0.2s',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
-        e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.5)';
+        e.currentTarget.style.backgroundColor = mouseEnterColor;
+        e.currentTarget.style.borderColor = mouseEnterBorderColor;
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = 'transparent';
-        e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.3)';
+        e.currentTarget.style.backgroundColor = mouseLeaveColor;
+        e.currentTarget.style.borderColor = mouseLeaveBorderColor;
       }}
     >
       <Wallet size={14} />
