@@ -1,6 +1,7 @@
 import { Send, Bot } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -64,36 +65,71 @@ export function AiChat() {
     setInput('');
     setIsTyping(true);
 
-      // Simulate AI response delay
-    setTimeout(() => {
-      const aiResponses: { [key: string]: string } = {
-        'hoodie': 'The Nexus Hoodie is one of our bestsellers! Perfect for any cyberpunk aesthetic. Limited edition with only 500 pieces. Want me to show you it?',
-        'discount': 'Connect your wallet to get exclusive VIP discounts on merchandise!',
-        'merch': 'We have a great selection: hoodies, caps, watches, and more. Each piece is limited edition.',
-        'nft': 'Our NFTs unlock exclusive perks: discounts, early access to drops, and community voting rights.',
-        'help': 'I can help you with:\n• Finding merch\n• Explaining our NFT benefits\n• Answering Web3 questions\n• Checking product details'
-      };
+    // 1. СОЗДАЕМ СЕКУНДОМЕР-ДЕТОНАТОР
+    const controller = new AbortController();
+    
+    // 2. ЗАВОДИМ ТАЙМЕР НА 60 СЕКУНД (60000 миллисекунд)
+    const timeoutId = setTimeout(() => {
+      controller.abort(); // Если прошло 60 секунд, убиваем запрос!
+    }, 60000);
 
-      let response = 'That\'s a great question! 🤔 I\'m here to help with any questions about our products or Web3 benefits. What would you like to know?';
+    // 2. ОТПРАВЛЯЕМ НА БЭКЕНД И ЖДЕМ (НАСТОЯЩАЯ ГЕНЕРАЦИЯ)
+    console.log("Отправляем на FastAPI:", userMessage.content);
+    try {
+      console.log("Стучимся на FastAPI...");
+      // Стучимся на ваш FastAPI сервер (адрес поменяете на свой, если нужно)
+      const response = await fetch('http://127.0.0.1:8000/api/ai-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // Отправляем текст юзера в формате JSON
+        body: JSON.stringify({ message: input }),
+        signal: controller.signal
+      });
+      console.log("Ответ от FastAPI (raw):", response);
+      clearTimeout(timeoutId);
 
-      const lowerInput = input.toLowerCase();
-      for (const [key, value] of Object.entries(aiResponses)) {
-        if (lowerInput.includes(key)) {
-          response = value;
-          break;
-        }
+      // Если сервер упал или выдал ошибку
+      if (!response.ok) {
+        throw new Error('Ошибка сервера FastAPI');
       }
 
+      // Распаковываем ответ от сервера
+      const data = await response.json();
+      console.log("Ответ от FastAPI:", data);
+
+      // 3. ПОЛУЧАЕМ ГОТОВЫЙ ОТВЕТ И ДОБАВЛЯЕМ В ЧАТ
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'ai',
-        content: response,
+        content: data.reply, // <-- Здесь лежит умный текст от Gemini!
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, aiMessage]);
+
+    } catch (error: any) { // <-- ДОБАВИЛИ : any, ТЕПЕРЬ TYPESCRIPT ДОВОЛЕН
+      clearTimeout(timeoutId); 
+      
+      let errorText = "System Error. Connection to Nexus Oracle lost. Please try again.";
+
+      // Теперь мы можем спокойно читать error.name
+      if (error.name === 'AbortError') {
+        errorText = "I'm so sorry, my neural circuits are overloaded right now and I'm taking too long to think. ⚙️ Please ask me again in a minute!";
+      }
+
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'ai',
+        content: errorText,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      
+    } finally {
       setIsTyping(false);
-    }, 800);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -204,7 +240,7 @@ export function AiChat() {
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word'
               }}>
-                {message.content}
+                <ReactMarkdown>{message.content}</ReactMarkdown>
               </div>
             ) : (
               <div style={{
@@ -220,7 +256,7 @@ export function AiChat() {
                 wordBreak: 'break-word',
                 boxShadow: '0 0 15px -5px #a855f7'
               }}>
-                {message.content}
+                <ReactMarkdown>{message.content}</ReactMarkdown>
               </div>
             )}
           </motion.div>

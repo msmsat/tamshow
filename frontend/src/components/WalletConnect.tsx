@@ -1,5 +1,6 @@
 import { Wallet } from 'lucide-react';
 import { useUserStore } from '../store/useUserStore';
+import { useEffect } from 'react';
 
 interface WalletConnectProps {
   color?: string; // Значок "?" означает, что цвет можно не передавать
@@ -11,7 +12,13 @@ interface WalletConnectProps {
 }
 
 export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 247, 0.3)', mouseEnterColor = 'rgba(168, 85, 247, 0.5)', mouseLeaveColor = 'rgba(168, 85, 247, 0.3)', mouseEnterBorderColor = 'rgba(168, 85, 247, 0.5)', mouseLeaveBorderColor = 'rgba(168, 85, 247, 0.3)' }: WalletConnectProps) {
-  const { walletAddress, connectWallet, disconnectWallet } = useUserStore();
+  const { walletAddress, connectWallet, disconnectWallet, checkVipOnBackend } = useUserStore();
+
+  // 2. ВОТ ЗДЕСЬ МЫ ВЫЗЫВАЕМ ПРОВЕРКУ!
+  // Этот код сработает ровно один раз, когда кнопка появится на экране
+  useEffect(() => {
+    checkVipOnBackend();
+  }, [checkVipOnBackend]);
 
   const handleConnect = async () => {
     // Симуляция подключения кошелька
@@ -22,6 +29,8 @@ export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 
     disconnectWallet();
   };
 
+  console.log('Matviko')
+  console.log(walletAddress)
   if (walletAddress) {
     return (
       <div style={{
