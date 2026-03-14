@@ -2,6 +2,10 @@ import { Wallet } from 'lucide-react';
 import { useUserStore } from '../store/useUserStore';
 import { useEffect } from 'react';
 
+// Компонент для подключения кошелька и отображения его статуса
+import { useWeb3Modal, useWeb3ModalAccount } from '@web3modal/ethers/react';
+import { tr } from 'framer-motion/client';
+
 interface WalletConnectProps {
   color?: string; // Значок "?" означает, что цвет можно не передавать
   borderColor?: string;
@@ -13,17 +17,33 @@ interface WalletConnectProps {
 
 export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 247, 0.3)', mouseEnterColor = 'rgba(168, 85, 247, 0.5)', mouseLeaveColor = 'rgba(168, 85, 247, 0.3)', mouseEnterBorderColor = 'rgba(168, 85, 247, 0.5)', mouseLeaveBorderColor = 'rgba(168, 85, 247, 0.3)' }: WalletConnectProps) {
   const { walletAddress, connectWallet, disconnectWallet, checkVipOnBackend } = useUserStore();
+  const tgId = "620994031"; // Заглушка для теста, потом заменим на реальный ID из Телеграма
 
   // 2. ВОТ ЗДЕСЬ МЫ ВЫЗЫВАЕМ ПРОВЕРКУ!
   // Этот код сработает ровно один раз, когда кнопка появится на экране
   useEffect(() => {
-    checkVipOnBackend();
+    checkVipOnBackend(tgId); // Передаем ID в функцию проверки
   }, [checkVipOnBackend]);
 
-  const handleConnect = async () => {
-    // Симуляция подключения кошелька
-    connectWallet('0x742d...4581');
+  // 1. Достаем функции из Web3Modal
+  const { open } = useWeb3Modal(); 
+  const { address, isConnected } = useWeb3ModalAccount();
+
+  // 2. Ваша функция теперь просто вызывает красивое окно!
+  const handleConnect = () => {
+    open(); 
   };
+
+  // 3. СЛЕДИМ ЗА МАГИЕЙ:
+  // Как только юзер отсканировал QR или нажал в Метамаске "Ок", 
+  // переменная isConnected станет true, и появится address.
+  useEffect(() => {
+    if (isConnected && address && tgId) {
+      console.log("Юзер подключился через Web3Modal! Отправляем Питону:", address);
+      // Вот тут мы кидаем адрес Питону, чтобы он сохранил его в базу!
+      connectWallet(tgId, address); 
+    }
+  }, [isConnected, address, tgId]);
 
   const handleDisconnect = () => {
     disconnectWallet();

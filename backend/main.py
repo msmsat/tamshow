@@ -10,14 +10,24 @@ from models import Base, User, UserAsset
 from google import genai
 from pydantic import BaseModel
 
+# 1. ИМПОРТИРУЕМ НАШИ РОУТЕРЫ ИЗ ПАПКИ
+from routers import wallet
+
+# 2. ПОДКЛЮЧАЕМ ИХ К ГЛАВНОМУ ПРИЛОЖЕНИЮ
+app.include_router(wallet.router)
+
 # 2. НОВАЯ НАСТРОЙКА КЛИЕНТА (Вставьте сюда ваш новый ключ!)
-ai_client = genai.Client(api_key="AIzaSyCzexWCmyR4L6wvFE5nkj7TOmxfuolMHMM")
+ai_client = genai.Client(api_key="AIzaSyBBechpF5stPvGGy5XfnbL3ulLsEoWUJe8")
 
 
 # 2. ФОРМА ПРИЕМА (Что мы ждем от React)
 # Pydantic строго проверяет, чтобы React прислал именно JSON с полем "message"
 class ChatMessage(BaseModel):
     message: str
+
+class WalletConnectRequest(BaseModel):
+    tg_id: str
+    wallet_address: str
 
 
 # Lifespan - это то, что выполняется при старте и выключении сервера
@@ -86,6 +96,7 @@ async def chat_with_oracle(request: ChatMessage):
 
 @app.get("/api/wallet/status")
 async def check_wallet_status(tg_id: str, db: AsyncSession = Depends(get_db)):
+    print(f"Проверяем статус кошелька для TG ID: {tg_id}")
     if not tg_id:
         return {"is_connected": False, "wallet_address": None}
 
@@ -107,12 +118,14 @@ async def check_wallet_status(tg_id: str, db: AsyncSession = Depends(get_db)):
 
         # 3. Если юзер ЕСТЬ и у него заполнен wallet_address
         if user.wallet_address:
+            print(f"✅ Пользователь {tg_id} уже привязал кошелек: {user.wallet_address}")
             return {
                 "is_connected": True,
                 "wallet_address": user.wallet_address
             }
             
         # 4. Если юзер есть, но кошелек еще не привязывал
+        print(f"⚠️ Пользователь {tg_id} найден, но кошелек не привязан.")
         return {
             "is_connected": False,
             "wallet_address": None
@@ -121,3 +134,20 @@ async def check_wallet_status(tg_id: str, db: AsyncSession = Depends(get_db)):
     except Exception as e:
         print(f"Ошибка БД при поиске/создании юзера: {e}")
         return {"is_connected": False, "wallet_address": None}
+
+# 2. Сам эндпоинт-заглушка
+@app.post("/api/wallet/connect")
+async def connect_wallet(req: WalletConnectRequest):
+    # Пока просто печатаем в терминал всё, что прилетело от React
+    print("=" * 40)
+    print("🔗 ПОЛУЧЕН ЗАПРОС НА ПРИВЯЗКУ КОШЕЛЬКА!")
+    print(f"👤 Telegram ID : {req.tg_id}")
+    print(f"👛 Адрес       : {req.wallet_address}")
+    print("=" * 40)
+    
+    # Возвращаем Реакту ответ, что всё прошло успешно
+    return {
+        "success": True, 
+        "message": "Данные успешно долетели до Питона!",
+        "wallet_address": req.wallet_address
+    }

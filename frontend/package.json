@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
+    "@web3modal/ethers": "^4.2.2",
+    "ethers": "^6.16.0",
     "framer-motion": "^12.35.0",
     "lucide-react": "^0.577.0",
     "react": "^19.2.0",

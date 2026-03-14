@@ -10,6 +10,33 @@ import { Cart, CheckoutFooter } from './pages/Cart';
 import { Profile } from './pages/Profile';
 import { useUIStore } from './store/useUIStore';
 import { useCartStore } from './store/useCartStore';
+// web3
+import { createWeb3Modal, defaultConfig } from '@web3modal/ethers/react';
+
+// 1. Настройка сети (пока берем обычный Ethereum)
+const mainnet = {
+  chainId: 1,
+  name: 'Ethereum',
+  currency: 'ETH',
+  explorerUrl: 'https://etherscan.io',
+  rpcUrl: 'https://cloudflare-eth.com'
+}
+
+// 2. Описание вашего магазина (Оно будет видно в кошельке юзера!)
+const metadata = {
+  name: 'Nexus Store',
+  description: 'Cyberpunk Web3 Shop',
+  url: 'https://localhost:5173', // Замените на ваш адрес, если он другой
+  icons: ['https://cdn-icons-png.flaticon.com/512/6001/6001864.png'] // Иконка кибер-магазина
+}
+
+// 3. Создаем само окно (ВАЖНО: Project ID пока тестовый, позже получим ваш личный)
+createWeb3Modal({
+  ethersConfig: defaultConfig({ metadata }),
+  chains: [mainnet],
+  projectId: 'b00d283c4f69f8c6eb8e547fbba246f4', // Это публичный тестовый ID, его хватит для начала
+  enableAnalytics: false
+});
 
 // Список наших вкладок
 const TABS = [
