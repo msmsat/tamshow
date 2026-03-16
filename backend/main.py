@@ -2,38 +2,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy import text
 
 from database import engine, get_db
-from models import Base, User, UserAsset
-from google import genai
-from pydantic import BaseModel
+from models import Base
 
 # 1. ИМПОРТИРУЕМ НАШИ РОУТЕРЫ ИЗ ПАПКИ
-from routers import wallet
+from routers import wallet, ai_chat
 
-# 2. ПОДКЛЮЧАЕМ ИХ К ГЛАВНОМУ ПРИЛОЖЕНИЮ
-app.include_router(wallet.router)
-
-# 2. НОВАЯ НАСТРОЙКА КЛИЕНТА (Вставьте сюда ваш новый ключ!)
-ai_client = genai.Client(api_key="AIzaSyBBechpF5stPvGGy5XfnbL3ulLsEoWUJe8")
-
-
-# 2. ФОРМА ПРИЕМА (Что мы ждем от React)
-# Pydantic строго проверяет, чтобы React прислал именно JSON с полем "message"
-class ChatMessage(BaseModel):
-    message: str
-
-class WalletConnectRequest(BaseModel):
-    tg_id: str
-    wallet_address: str
-
-
-# Lifespan - это то, что выполняется при старте и выключении сервера
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # При старте: создаем все таблицы в базе данных
+    # При старте: создаем таблицы
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     print("✅ База данных готова!")
@@ -41,7 +20,8 @@ async def lifespan(app: FastAPI):
     # При выключении: закрываем соединения
     await engine.dispose()
 
-app = FastAPI(lifespan=lifespan)
+# Инициализация FastAPI
+app = FastAPI(lifespan=lifespan, title="Nexus Store API")
 
 # Настройка CORS для React-фронтенда
 app.add_middleware(
@@ -52,102 +32,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ==========================================
+# 🔌 ПОДКЛЮЧЕНИЕ МОДУЛЕЙ (РОУТЕРОВ)
+# ==========================================
+app.include_router(wallet.router)
+app.include_router(ai_chat.router)
+
+# ==========================================
+# 🛠 БАЗОВЫЕ ТЕСТОВЫЕ ЭНДПОИНТЫ
+# ==========================================
 @app.get("/hello/{name}")
 def say_hello(name: str):
     return {"message": f"Hello {name}"}
 
-# Тестовый эндпоинт для проверки связи с базой данных
 @app.get("/test-db")
 async def test_db(db: AsyncSession = Depends(get_db)):
-    # Делаем простейший запрос к базе
     result = await db.execute(text("SELECT version();"))
     version = result.scalar()
     return {"message": "Успешное подключение к БД!", "postgres_version": version}
-
-@app.post("/api/ai-chat")
-async def chat_with_oracle(request: ChatMessage):
-    print("1")
-    # Вытаскиваем текст, который написал пользователь в React
-    user_text = request.message
-    print(f"Получено сообщение от пользователя: {user_text}")
-    
-    # Создаем промпт: объясняем Gemini, как ей нужно себя вести
-    system_prompt = f"""
-    Ты - Nexus Oracle, виртуальный ИИ-ассистент киберпанк-магазина 'Nexus Store'.
-    Ты должен отвечать на вопросы пользователя коротко, стильно и с долей киберпанк-сленга.
-    Вопрос пользователя: {user_text}
-    """
-    
-    try:
-        # Отправляем вопрос в Google и ждем ответ
-        response = ai_client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=system_prompt,
-        )
-        
-        # Возвращаем ответ обратно в React в формате JSON
-        # Ключ "reply" должен совпадать с тем, что мы написали во фронтенде (data.reply)
-        return {"reply": response.text}
-        
-    except Exception as e:
-        # Если Google недоступен или лимит исчерпан
-        print(f"Ошибка Gemini: {e}")
-        return {"reply": "Системный сбой. Связь с Оракулом прервана. Попробуйте позже."}
-
-@app.get("/api/wallet/status")
-async def check_wallet_status(tg_id: str, db: AsyncSession = Depends(get_db)):
-    print(f"Проверяем статус кошелька для TG ID: {tg_id}")
-    if not tg_id:
-        return {"is_connected": False, "wallet_address": None}
-
-    try:
-        # 1. Ищем юзера в таблице users по его Telegram ID
-        query = select(User).where(User.telegram_id == tg_id)
-        result = await db.execute(query)
-        user = result.scalar_one_or_none()
-
-        # 2. ТИХАЯ РЕГИСТРАЦИЯ: Если юзера нет, создаем его прямо сейчас!
-        if not user:
-            new_user = User(telegram_id=tg_id)
-            db.add(new_user)
-            await db.commit() # Сохраняем в базу данных
-            
-            print(f"✅ Создан новый пользователь с TG ID: {tg_id}")
-            # Возвращаем False, так как кошелек он еще не привязал
-            return {"is_connected": False, "wallet_address": None}
-
-        # 3. Если юзер ЕСТЬ и у него заполнен wallet_address
-        if user.wallet_address:
-            print(f"✅ Пользователь {tg_id} уже привязал кошелек: {user.wallet_address}")
-            return {
-                "is_connected": True,
-                "wallet_address": user.wallet_address
-            }
-            
-        # 4. Если юзер есть, но кошелек еще не привязывал
-        print(f"⚠️ Пользователь {tg_id} найден, но кошелек не привязан.")
-        return {
-            "is_connected": False,
-            "wallet_address": None
-        }
-
-    except Exception as e:
-        print(f"Ошибка БД при поиске/создании юзера: {e}")
-        return {"is_connected": False, "wallet_address": None}
-
-# 2. Сам эндпоинт-заглушка
-@app.post("/api/wallet/connect")
-async def connect_wallet(req: WalletConnectRequest):
-    # Пока просто печатаем в терминал всё, что прилетело от React
-    print("=" * 40)
-    print("🔗 ПОЛУЧЕН ЗАПРОС НА ПРИВЯЗКУ КОШЕЛЬКА!")
-    print(f"👤 Telegram ID : {req.tg_id}")
-    print(f"👛 Адрес       : {req.wallet_address}")
-    print("=" * 40)
-    
-    # Возвращаем Реакту ответ, что всё прошло успешно
-    return {
-        "success": True, 
-        "message": "Данные успешно долетели до Питона!",
-        "wallet_address": req.wallet_address
-    }

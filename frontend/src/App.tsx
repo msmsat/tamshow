@@ -34,7 +34,7 @@ const metadata = {
 createWeb3Modal({
   ethersConfig: defaultConfig({ metadata }),
   chains: [mainnet],
-  projectId: 'b00d283c4f69f8c6eb8e547fbba246f4', // Это публичный тестовый ID, его хватит для начала
+  projectId: '8ef5ab1f5b6392d772cea581cac32f1c', // Это публичный тестовый ID, его хватит для начала
   enableAnalytics: false
 });
 

@@ -3,8 +3,7 @@ import { useUserStore } from '../store/useUserStore';
 import { useEffect } from 'react';
 
 // Компонент для подключения кошелька и отображения его статуса
-import { useWeb3Modal, useWeb3ModalAccount } from '@web3modal/ethers/react';
-import { tr } from 'framer-motion/client';
+import { useWeb3Modal, useWeb3ModalAccount, useDisconnect } from '@web3modal/ethers/react';
 
 interface WalletConnectProps {
   color?: string; // Значок "?" означает, что цвет можно не передавать
@@ -19,34 +18,57 @@ export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 
   const { walletAddress, connectWallet, disconnectWallet, checkVipOnBackend } = useUserStore();
   const tgId = "620994031"; // Заглушка для теста, потом заменим на реальный ID из Телеграма
 
+  // 1. Достаем функции из Web3Modal
+  const { open } = useWeb3Modal(); 
+  const { address, isConnected } = useWeb3ModalAccount();
+  const { disconnect } = useDisconnect(); // <-- ШОКЕР ДЛЯ WEB3MODAL
+
   // 2. ВОТ ЗДЕСЬ МЫ ВЫЗЫВАЕМ ПРОВЕРКУ!
   // Этот код сработает ровно один раз, когда кнопка появится на экране
   useEffect(() => {
     checkVipOnBackend(tgId); // Передаем ID в функцию проверки
   }, [checkVipOnBackend]);
 
-  // 1. Достаем функции из Web3Modal
-  const { open } = useWeb3Modal(); 
-  const { address, isConnected } = useWeb3ModalAccount();
-
   // 2. Ваша функция теперь просто вызывает красивое окно!
   const handleConnect = () => {
     open(); 
   };
 
-  // 3. СЛЕДИМ ЗА МАГИЕЙ:
-  // Как только юзер отсканировал QR или нажал в Метамаске "Ок", 
-  // переменная isConnected станет true, и появится address.
+  // 2. ЕДИНСТВЕННЫЙ КОНТРОЛЛЕР (Без дублирования!)
   useEffect(() => {
-    if (isConnected && address && tgId) {
-      console.log("Юзер подключился через Web3Modal! Отправляем Питону:", address);
-      // Вот тут мы кидаем адрес Питону, чтобы он сохранил его в базу!
-      connectWallet(tgId, address); 
-    }
-  }, [isConnected, address, tgId]);
+    const handleWeb3ModalConnection = async () => {
+      // Если кошелек подключен в браузере, но Питон о нем еще не знает
+      if (isConnected && address && !walletAddress && tgId) {
+        
+        console.log("🦊 Web3Modal дал адрес. Спрашиваем Питона...");
+        
+        // Отправляем Питону. Питон проверяет Alchemy -> Блокчейн -> Баланс USDC
+        const isApprovedByBackend = await connectWallet(tgId, address);
+        
+        if (!isApprovedByBackend) {
+          console.log("❌ Питон отказал (нет 1 USDC)! Стираем память Web3Modal.");
+          disconnect(); // Выкидываем кошелек, чтобы юзер не прошел
+        } else {
+          console.log("✅ Питон одобрил! Кошелек привязан.");
+        }
+      }
+    };
 
-  const handleDisconnect = () => {
-    disconnectWallet();
+    handleWeb3ModalConnection();
+  }, [isConnected, address, walletAddress, tgId, connectWallet, disconnect]);
+
+  // 3. ОТКЛЮЧЕНИЕ КОШЕЛЬКА (Крестик)
+  const handleDisconnect = async () => {
+    if (tgId) {
+      const isDisconnectedOnBackend = await disconnectWallet(tgId);
+      
+      if (isDisconnectedOnBackend) {
+        disconnect(); // Стираем кэш браузера только если Питон разрешил
+        console.log("🔌 Кошелек полностью отвязан!");
+      } else {
+        alert("Ошибка связи с сервером. Не удалось отвязать кошелек.");
+      }
+    }
   };
 
   console.log('Matviko')

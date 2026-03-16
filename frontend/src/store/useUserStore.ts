@@ -6,8 +6,8 @@ interface UserState {
   isVip: boolean;
 
   // Действия
-  connectWallet: (tgId: string, address: string) => Promise<void>;
-  disconnectWallet: () => void;
+  connectWallet: (tgId: string, address: string) => Promise<boolean>;
+  disconnectWallet: (tgId: string) => Promise<boolean>;
   checkVipOnBackend: (tgId: string) => Promise<void>;
 }
 
@@ -17,29 +17,52 @@ export const useUserStore = create<UserState>((set) => ({
 
  connectWallet: async (tgId: string, address: string) => {
     try {
-      // 1. Стучимся к Питону и отдаем ему новенький адрес из MetaMask
       const response = await fetch('http://127.0.0.1:8000/api/wallet/connect', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tg_id: tgId, wallet_address: address })
       });
 
-      if (response.ok) {
-        // 2. Питон ответил ОК (сохранил в БД)! Только теперь рисуем адрес на сайте
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Бэкенд ОДОБРИЛ (денег хватает, в базу записано)
         set({ walletAddress: address });
+        return true; // Возвращаем успех!
       } else {
-        console.error("Бэкенд отказался сохранять кошелек");
+        // Бэкенд ОТКАЗАЛ (меньше 1 USDC или другая ошибка)
+        console.error("Бэкенд отказал:", data.error);
+        return false; // Возвращаем провал!
       }
       
     } catch (error) {
-      console.error("Ошибка при отправке кошелька на бэкенд", error);
+      console.error("Ошибка сети", error);
+      return false;
     }
   },
 
-  disconnectWallet: () => {
-    set({ walletAddress: null, isVip: false });
+  disconnectWallet: async (tgId: string) => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/wallet/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tg_id: tgId })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        set({ walletAddress: null });
+        return true; // ✅ Питон дал добро!
+      } else {
+        console.error("❌ Бэкенд не смог отвязать кошелек:", data.error);
+        return false; // ❌ Питон отказал!
+      }
+      
+    } catch (error) {
+      console.error("🌐 Ошибка сети при отключении кошелька:", error);
+      return false; // ❌ Ошибка связи!
+    }
   },
 
   checkVipOnBackend: async (tgId: string) => {
