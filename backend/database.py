@@ -1,10 +1,14 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from models import Base
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Строка подключения к PostgreSQL (обрати внимание на +asyncpg)
 # Формат: postgresql+asyncpg://пользователь:пароль@хост:порт/имя_базы
-DATABASE_URL = "postgresql+asyncpg://postgres:Matviko@localhost:5432/tamshow_db"
-
+DATABASE_URL = os.getenv("DATABASE_URL")
 # Создаем асинхронный движок (echo=True будет выводить все SQL-запросы в терминал, удобно для дебага)
 engine = create_async_engine(DATABASE_URL, echo=True)
 

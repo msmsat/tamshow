@@ -1,6 +1,13 @@
+from dotenv import load_dotenv
 from fastapi import APIRouter
 from pydantic import BaseModel
 from google import genai
+import os
+
+
+# Load environment variables from .env file
+load_dotenv()
+
 
 # 1. СОЗДАЕМ РОУТЕР
 router = APIRouter(
@@ -9,7 +16,7 @@ router = APIRouter(
 )
 
 # 2. НАСТРАЙКА КЛИЕНТА ИИ (Ваш ключ)
-ai_client = genai.Client(api_key="AIzaSyCzexWCmyR4L6wvFE5nkj7TOmxfuolMHMM")
+ai_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # 3. ФОРМА ПРИЕМА ДАННЫХ
 class ChatMessage(BaseModel):
