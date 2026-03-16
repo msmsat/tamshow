@@ -9,6 +9,7 @@ from models import Base
 
 # 1. ИМПОРТИРУЕМ НАШИ РОУТЕРЫ ИЗ ПАПКИ
 from routers import wallet, ai_chat
+from routers.cart import router as cart_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,7 +38,7 @@ app.add_middleware(
 # ==========================================
 app.include_router(wallet.router)
 app.include_router(ai_chat.router)
-
+app.include_router(cart_router)  # Подключаем роутер корзины
 # ==========================================
 # 🛠 БАЗОВЫЕ ТЕСТОВЫЕ ЭНДПОИНТЫ
 # ==========================================

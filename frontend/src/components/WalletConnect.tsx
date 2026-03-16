@@ -1,6 +1,6 @@
 import { Wallet } from 'lucide-react';
 import { useUserStore } from '../store/useUserStore';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 // Компонент для подключения кошелька и отображения его статуса
 import { useWeb3Modal, useWeb3ModalAccount, useDisconnect } from '@web3modal/ethers/react';
@@ -19,6 +19,9 @@ export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 
   const tgId = "620994031"; // Заглушка для теста, потом заменим на реальный ID из Телеграма
 
   // 1. Достаем функции из Web3Modal
+  // СОЗДАЕМ ХРАНИЛИЩЕ ДЛЯ ТЕКСТА ОШИБКИ
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const { open } = useWeb3Modal(); 
   const { address, isConnected } = useWeb3ModalAccount();
   const { disconnect } = useDisconnect(); // <-- ШОКЕР ДЛЯ WEB3MODAL
@@ -31,6 +34,7 @@ export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 
 
   // 2. Ваша функция теперь просто вызывает красивое окно!
   const handleConnect = () => {
+    setErrorMsg(null); // Сбрасываем ошибку при новом клике
     open(); 
   };
 
@@ -39,15 +43,26 @@ export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 
     const handleWeb3ModalConnection = async () => {
       // Если кошелек подключен в браузере, но Питон о нем еще не знает
       if (isConnected && address && !walletAddress && tgId) {
-        
         console.log("🦊 Web3Modal дал адрес. Спрашиваем Питона...");
+        setErrorMsg(null);
         
-        // Отправляем Питону. Питон проверяет Alchemy -> Блокчейн -> Баланс USDC
-        const isApprovedByBackend = await connectWallet(tgId, address);
+        const result = await connectWallet(tgId, address);
         
-        if (!isApprovedByBackend) {
-          console.log("❌ Питон отказал (нет 1 USDC)! Стираем память Web3Modal.");
-          disconnect(); // Выкидываем кошелек, чтобы юзер не прошел
+        if (!result.success) {
+          console.log("❌ Питон отказал! Стираем память Web3Modal.");
+          await disconnect(); 
+          
+          // Анализируем ошибку от Питона и выдаем короткий вариант
+          const serverError = result.error || "";
+          let shortError = "Сбой сети"; // Ошибка по умолчанию
+          
+          if (serverError.includes("USDC") || serverError.includes("баланс")) {
+            shortError = "Нужно 1.0 USDC";
+          } else if (serverError.includes("Unauthorized") || serverError.includes("RPC")) {
+            shortError = "Ошибка сервера";
+          }
+          
+          setErrorMsg(shortError);
         } else {
           console.log("✅ Питон одобрил! Кошелек привязан.");
         }
@@ -57,17 +72,17 @@ export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 
     handleWeb3ModalConnection();
   }, [isConnected, address, walletAddress, tgId, connectWallet, disconnect]);
 
-  // 3. ОТКЛЮЧЕНИЕ КОШЕЛЬКА (Крестик)
+  // 3. ОТКЛЮЧЕНИЕ
   const handleDisconnect = async () => {
-    if (tgId) {
-      const isDisconnectedOnBackend = await disconnectWallet(tgId);
-      
-      if (isDisconnectedOnBackend) {
-        disconnect(); // Стираем кэш браузера только если Питон разрешил
-        console.log("🔌 Кошелек полностью отвязан!");
-      } else {
-        alert("Ошибка связи с сервером. Не удалось отвязать кошелек.");
+    try {
+      await disconnect(); 
+      if (tgId) {
+        await disconnectWallet(tgId);
+        setErrorMsg(null); // Сбрасываем ошибку при выходе
+        console.log("🔌 Кошелек элегантно отвязан!");
       }
+    } catch (error) {
+      console.error("Ошибка при отключении:", error);
     }
   };
 
@@ -93,7 +108,7 @@ export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 
           backgroundColor: '#22c55e',
           animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
         }} />
-        {walletAddress}
+        {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
         <button
           onClick={handleDisconnect}
           style={{
@@ -113,33 +128,41 @@ export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 
   }
 
   return (
-    <button
-      onClick={handleConnect}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        backgroundColor: 'transparent',
-        border: borderColor,
-        borderRadius: '8px',
-        padding: '8px 12px',
-        color: color,
-        fontSize: '12px',
-        fontWeight: 500,
-        cursor: 'pointer',
-        transition: 'all 0.2s',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = mouseEnterColor;
-        e.currentTarget.style.borderColor = mouseEnterBorderColor;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = mouseLeaveColor;
-        e.currentTarget.style.borderColor = mouseLeaveBorderColor;
-      }}
-    >
-      <Wallet size={14} />
-      Connect Wallet
-    </button>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+      <button
+        onClick={handleConnect}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          backgroundColor: 'transparent',
+          border: borderColor,
+          borderRadius: '8px',
+          padding: '8px 12px',
+          color: color,
+          fontSize: '12px',
+          fontWeight: 500,
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = mouseEnterColor;
+          e.currentTarget.style.borderColor = mouseEnterBorderColor;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = mouseLeaveColor;
+          e.currentTarget.style.borderColor = mouseLeaveBorderColor;
+        }}
+      >
+        <Wallet size={14} />
+        Connect Wallet
+      </button>
+    {/* Вывод ошибки от Питона */}
+      {errorMsg && (
+        <span style={{ color: '#ef4444', fontSize: '11px', textAlign: 'left', maxWidth: '180px' }}>
+          {errorMsg}
+        </span>
+      )}
+    </div>
   );
 }

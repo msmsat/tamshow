@@ -120,3 +120,17 @@ class UserAsset(Base):
     last_checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="assets")
+
+# 9️⃣ Корзина (cart_items)
+class CartItem(Base):
+    __tablename__ = "cart_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    # Привязываем просто по telegram_id (как строку), чтобы не делать сложных JOIN-ов при каждом клике
+    telegram_id: Mapped[str] = mapped_column(String, index=True) 
+    # Храним ID товара (в виде строки, так как у вас с фронта приходят строковые ID)
+    product_id: Mapped[str] = mapped_column(String, index=True)
+    # Количество
+    quantity: Mapped[int] = mapped_column(Integer, default=1)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

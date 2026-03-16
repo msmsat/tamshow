@@ -6,7 +6,7 @@ interface UserState {
   isVip: boolean;
 
   // Действия
-  connectWallet: (tgId: string, address: string) => Promise<boolean>;
+  connectWallet: (tgId: string, address: string) => Promise<{success: boolean, error?: string}>;
   disconnectWallet: (tgId: string) => Promise<boolean>;
   checkVipOnBackend: (tgId: string) => Promise<void>;
 }
@@ -26,18 +26,16 @@ export const useUserStore = create<UserState>((set) => ({
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Бэкенд ОДОБРИЛ (денег хватает, в базу записано)
         set({ walletAddress: address });
-        return true; // Возвращаем успех!
+        return { success: true };
       } else {
-        // Бэкенд ОТКАЗАЛ (меньше 1 USDC или другая ошибка)
-        console.error("Бэкенд отказал:", data.error);
-        return false; // Возвращаем провал!
+        // Возвращаем текст ошибки, который нам прислал Питон!
+        return { success: false, error: data.error || "Отклонено сервером" };
       }
       
     } catch (error) {
       console.error("Ошибка сети", error);
-      return false;
+      return { success: false, error: "Сервер недоступен" };
     }
   },
 

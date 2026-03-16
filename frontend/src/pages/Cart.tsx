@@ -6,7 +6,7 @@ import { useCartStore } from '../store/useCartStore';
 import { WalletConnect } from '../components/WalletConnect';
 
 export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
-  const { isVip } = useUserStore();
+  const { walletAddress } = useUserStore();
   const { cart, removeFromCart, updateQuantity: updateCartQuantity } = useCartStore();
 
   const handleQuantityChange = (productId: string, delta: number) => {
@@ -23,7 +23,7 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
 
   // Вычисления
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const discount = isVip ? Math.round(subtotal * 0.2) : 0;
+  const discount = walletAddress ? Math.round(subtotal * 0.2) : 0;
 
   // Empty State - Data Void
   if (cart.length === 0) {
@@ -247,7 +247,7 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
 
                 {/* Price Display */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {isVip && (
+                  {walletAddress && (
                     <span style={{
                       fontSize: '11px',
                       color: '#9ca3af',
@@ -261,7 +261,7 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
                     fontWeight: 700,
                     color: '#a855f7'
                   }}>
-                    ${isVip ? Math.round(item.price * 0.8) : item.price}
+                    ${walletAddress ? Math.round(item.price * 0.8) : item.price}
                   </span>
                 </div>
               </div>
@@ -342,7 +342,7 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
       </div>
 
       {/* Zone B: Smart Contract Status */}
-      {isVip ? (
+      {walletAddress ? (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

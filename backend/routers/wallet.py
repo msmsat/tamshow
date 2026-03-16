@@ -93,7 +93,7 @@ async def connect_wallet(req: WalletConnectRequest, db: AsyncSession = Depends(g
             print(f"💵 Баланс USDC : {real_usdc_balance}$")
             
             # 3. ГЛАВНАЯ ПРОВЕРКА: Если меньше 1 бакса
-            if real_usdc_balance < 1.0:
+            if real_usdc_balance < 0.0:
                 print("❌ Отказ: Недостаточно средств на балансе!")
                 return {
                     "success": False, 

@@ -12,8 +12,8 @@ const FEATURED_PRODUCTS: Product[] = [
 ];
 
 export function Home({ onTabChange }: { onTabChange?: (tab: string) => void }) {
-  const { isVip } = useUserStore();
   const { selectProduct } = useUIStore();
+  const { walletAddress } = useUserStore();
 
   return (
     <div style={{
@@ -82,7 +82,7 @@ export function Home({ onTabChange }: { onTabChange?: (tab: string) => void }) {
           position: 'relative',
           zIndex: 1
         }}>
-          {isVip ? (
+          {walletAddress ? (
             <>
               <h2 style={{
                 fontSize: '20px',
