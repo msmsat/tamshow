@@ -1,7 +1,13 @@
+from dotenv import load_dotenv
 from fastapi import APIRouter
 from pydantic import BaseModel
 from google import genai
 import os
+
+
+# Load environment variables from .env file
+load_dotenv()
+
 
 # 1. СОЗДАЕМ РОУТЕР
 router = APIRouter(
