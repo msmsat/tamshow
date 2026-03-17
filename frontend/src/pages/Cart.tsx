@@ -1,13 +1,30 @@
 import { ShoppingBag, Minus, Trash2, Plus, Zap, ShieldCheck, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUserStore } from '../store/useUserStore';
 import { useCartStore } from '../store/useCartStore';
 import { WalletConnect } from '../components/WalletConnect';
 
+
 export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
+  export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { walletAddress } = useUserStore();
-  const { cart, removeFromCart, updateQuantity: updateCartQuantity } = useCartStore();
+  
+  // 1. ДОСТАЕМ fetchCart из стора
+  const { cart, removeFromCart, updateQuantity: updateCartQuantity, fetchCart } = useCartStore();
+  // 2. ВРЕМЕННО ХАРДКОДИМ ID (позже возьмем из Telegram)
+  const tgId = "620994031"; 
+
+  // 3. ДОСТАЕМ ВСЕ ТОВАРЫ (Вам нужно взять их оттуда же, откуда вы их берете в Shop.tsx)
+  // Например, если у вас есть useShopStore: const { products } = useShopStore();
+  // Если они у вас пока просто в константе/массиве, подставьте сюда этот массив.
+  const allProducts = useProductStore(state => state.products); // <-- ЗАМЕНИТЕ НА ВАШ МАССИВ ТОВАРОВ
+
+  // 4. ДОБАВЛЯЕМ МАГИЮ ЗАГРУЗКИ:
+  useEffect(() => {
+    // При открытии корзины - качаем ее из БД!
+    fetchCart(tgId, allProducts);
+  }, []); // Пустые скобки означают "сделать 1 раз при открытии"
 
   const handleQuantityChange = (productId: string, delta: number) => {
     const item = cart.find(i => i.id === productId);
