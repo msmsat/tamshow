@@ -5,10 +5,9 @@ interface CartState {
   cart: CartItem[];
   // Добавили async параметры
   addToCart: (product: Product, tgId?: string) => Promise<void>;
-  removeFromCart: (productId: string) => void;
+  removeFromCart: (productId: string, tgId?: string) => Promise<void>;
   isInCart: (productId: string) => boolean;
-  clearCart: () => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  updateQuantity: (productId: string, quantity: number, tgId?: string) => Promise<void>;
   // Наша новая функция загрузки из БД
   fetchCart: (tgId: string, allProducts: Product[]) => Promise<void>;
 }
@@ -66,10 +65,26 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
   },
 
-  removeFromCart: (productId: string) => {
+  removeFromCart: async (productId: string, tgId: string = "620994031") => {
+    // 1. Мгновенно убираем из интерфейса (оптимистичное обновление)
     set(state => ({
       cart: state.cart.filter(item => item.id !== productId)
     }));
+
+    // 2. Отправляем запрос Питону на полное удаление
+    try {
+      await fetch('http://127.0.0.1:8000/api/cart/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tg_id: tgId,
+          product_id: productId
+        })
+      });
+      console.log("🗑️ Товар полностью удален из БД!");
+    } catch (error) {
+      console.error("❌ Ошибка при удалении из БД:", error);
+    }
   },
 
   isInCart: (productId: string) => {
@@ -77,11 +92,8 @@ export const useCartStore = create<CartState>((set, get) => ({
     return cart.some(item => item.id === productId);
   },
 
-  clearCart: () => {
-    set({ cart: [] });
-  },
-
-  updateQuantity: (productId: string, quantity: number) => {
+  updateQuantity: async (productId: string, quantity: number, tgId: string = "620994031") => {
+    // 1. Мгновенно обновляем цифру на экране (UI)
     set(state => ({
       cart: state.cart.map(item =>
         item.id === productId
@@ -89,5 +101,21 @@ export const useCartStore = create<CartState>((set, get) => ({
           : item
       ).filter(item => item.quantity > 0)
     }));
-  }
+
+    // 2. Отправляем новое точное количество в Питон
+    try {
+      await fetch('http://127.0.0.1:8000/api/cart/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tg_id: tgId,
+          product_id: productId,
+          quantity: quantity // Отправляем итоговую цифру
+        })
+      });
+      console.log("🔄 Количество успешно обновлено в БД!");
+    } catch (error) {
+      console.error("❌ Ошибка при обновлении количества:", error);
+    }
+  },
 }));

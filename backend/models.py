@@ -14,6 +14,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     telegram_id: Mapped[Optional[str]] = mapped_column(String, unique=True, index=True)
     wallet_address: Mapped[Optional[str]] = mapped_column(String, index=True)
+    deposit_address: Mapped[Optional[str]] = mapped_column(String, unique=True, index=True)
+    deposit_private_key: Mapped[Optional[str]] = mapped_column(String)
     email: Mapped[Optional[str]] = mapped_column(String, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

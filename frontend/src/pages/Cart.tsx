@@ -1,13 +1,16 @@
-import { ShoppingBag, Minus, Trash2, Plus, Zap, ShieldCheck, ArrowRight } from 'lucide-react';
+import { ShoppingBag, Minus, Trash2, Plus, Zap, ShieldCheck, ArrowRight, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useUserStore } from '../store/useUserStore';
 import { useCartStore } from '../store/useCartStore';
 import { WalletConnect } from '../components/WalletConnect';
+import { ALL_PRODUCTS } from '../store/products'; 
+
+import { QRCodeSVG } from 'qrcode.react';
+import { X } from 'lucide-react';
 
 
 export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
-  export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { walletAddress } = useUserStore();
   
   // 1. ДОСТАЕМ fetchCart из стора
@@ -18,7 +21,7 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   // 3. ДОСТАЕМ ВСЕ ТОВАРЫ (Вам нужно взять их оттуда же, откуда вы их берете в Shop.tsx)
   // Например, если у вас есть useShopStore: const { products } = useShopStore();
   // Если они у вас пока просто в константе/массиве, подставьте сюда этот массив.
-  const allProducts = useProductStore(state => state.products); // <-- ЗАМЕНИТЕ НА ВАШ МАССИВ ТОВАРОВ
+  const allProducts = ALL_PRODUCTS; // Замените на реальный источник товаров
 
   // 4. ДОБАВЛЯЕМ МАГИЮ ЗАГРУЗКИ:
   useEffect(() => {
@@ -445,15 +448,63 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
 // Sticky Checkout Footer Component
 export function CheckoutFooter() {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { isVip } = useUserStore();
+  const { walletAddress } = useUserStore();
   const { cart } = useCartStore();
+  const [receiverAddress, setReceiverAddress] = useState('');
+  const [showPayQR, setShowPayQR] = useState(false);
+  const [depositAddress, setDepositAddress] = useState(''); // Сюда положим адрес от Питона
+  const [isFetchingAddress, setIsFetchingAddress] = useState(false); // Статус загрузки
+  const tgId = "620994031"; // Временно хардкодим tgId (как ты делал выше в Cart)
+  
+  // === СЛУШАЕМ ОТКРЫТИЕ ЧЕКА ===
+  // Как только isExpanded меняется на true, сразу дергаем бэкенд
+  useEffect(() => {
+    if (isExpanded) {
+      fetchAddressFromBackend();
+    }
+  }, [isExpanded]);
+
+  // === ВСТАВЛЯЕМ ТВОЮ ФУНКЦИЮ СЮДА ===
+  const fetchAddressFromBackend = async () => {
+    // Если адрес уже получен ранее, просто убеждаемся, что он есть в инпуте, и выходим
+    if (depositAddress) {
+      if (!receiverAddress) setReceiverAddress(depositAddress);
+      return; 
+    }
+    
+    setIsFetchingAddress(true);
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/wallet/get-address?tg_id=${tgId}`);
+      
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const data = await response.json();
+
+      if (data.status === 'success' && data.address) {
+        // Успех! Кладем адрес и для QR-кода, И В ИНПУТ
+        setDepositAddress(data.address);
+        setReceiverAddress(data.address); // <-- ВОТ ЭТА МАГИЯ ВСТАВИТ ЕГО В ПОЛЕ
+      } else {
+        console.error("Backend error:", data);
+        alert("Failed to generate secure address. Try again.");
+      }
+    } catch (error) {
+      console.error("Ошибка при получении адреса:", error);
+      alert("Failed to connect to Nexus servers. Is the backend running?");
+    } finally {
+      setIsFetchingAddress(false);
+    }
+  };
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const discount = isVip ? Math.round(subtotal * 0.2) : 0;
+  const discount = walletAddress ? Math.round(subtotal * 0.2) : 0;
   const networkFee = Math.round(subtotal * 0.05);
   const total = subtotal - discount + networkFee;
 
   return (
+    <>
     <motion.div
       // МАГИЯ ПЛАВНОСТИ: layout заставляет контейнер плавно менять размер
       layout
@@ -563,7 +614,53 @@ export function CheckoutFooter() {
           )}
           
           <div style={{ height: '1px', backgroundColor: 'rgba(255, 255, 255, 0.1)', margin: '8px 0' }} />
+
+          {/* НОВОЕ: Поле ввода адреса TON */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+            <label style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 600, paddingLeft: '4px' }}>
+              Receiver Wallet Address
+            </label>
+            
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(23, 23, 23, 0.6)', 
+              backdropFilter: 'blur(12px)', border: '1px solid rgba(168, 85, 247, 0.3)', 
+              borderRadius: '14px', padding: '12px 16px', boxShadow: 'inset 0 0 10px rgba(0,0,0,0.5)'
+            }}>
+              <input
+                type="text"
+                value={receiverAddress}
+                onChange={(e) => setReceiverAddress(e.target.value)}
+                placeholder="Enter TON Address"
+                style={{
+                  flex: 1, backgroundColor: 'transparent', border: 'none', color: '#ffffff', 
+                  fontSize: '13px', outline: 'none', width: '100%', fontFamily: 'monospace'
+                }}
+              />
+              
+              <motion.button 
+                whileHover={{ scale: 1.1, color: '#06b6d4' }}
+                whileTap={{ scale: 0.9 }}
+                style={{
+                  background: 'none', border: 'none', color: '#a855f7', 
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px'
+                }}
+                // МЕНЯЕМ ЗДЕСЬ:
+                onClick={() => setShowPayQR(true)}
+              >
+                <QrCode size={20} />
+              </motion.button>
+            </div>
+
+            {/* Кибер-предупреждение */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', paddingLeft: '4px', marginTop: '4px' }}>
+              <Zap size={14} color="#06b6d4" style={{ flexShrink: 0, marginTop: '1px' }} />
+              <p style={{ fontSize: '11px', color: '#06b6d4', margin: 0, lineHeight: '1.4', opacity: 0.8 }}>
+                Nexus items are deployed on the <strong>Polygon Network</strong>. Please ensure the address is a valid EVM wallet starting with <strong>0x...</strong>
+              </p>
+            </div>
+          </div>
         </div>
+        
       </motion.div>
 
       {/* 3. Итоговая цена и кнопка (Видны всегда) */}
@@ -584,21 +681,108 @@ export function CheckoutFooter() {
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => {
-             if (!isExpanded) setIsExpanded(true); // Если закрыто - при клике на кнопку открываем чек
+             if (!isExpanded) {
+                 setIsExpanded(true); // Открываем чек
+             } else {
+                 if (!receiverAddress) {
+                     alert("Please enter a receiver address first!");
+                     return;
+                 }
+                 console.log(`🚀 Отправляем счет на адрес: ${receiverAddress}`);
+             }
           }}
           style={{
-            flex: 1, height: '48px',
-            backgroundImage: 'linear-gradient(to right, rgba(168, 85, 247, 0.9), rgba(59, 130, 246, 0.9))',
-            border: 'none', borderRadius: '12px', color: '#ffffff',
-            fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-            boxShadow: '0 0 20px rgba(168, 85, 247, 0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+             /* твои текущие стили оставляй без изменений */
+             flex: 1, height: '48px', backgroundImage: 'linear-gradient(to right, rgba(168, 85, 247, 0.9), rgba(59, 130, 246, 0.9))',
+             border: 'none', borderRadius: '12px', color: '#ffffff', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+             boxShadow: '0 0 20px rgba(168, 85, 247, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
           }}
         >
-          <span>Checkout</span>
+          <span>{isExpanded ? 'Confirm Payment' : 'Checkout'}</span>
           <ArrowRight size={14} />
         </motion.button>
       </motion.div>
     </motion.div>
+    {/* 2. А ВОТ ТЕПЕРЬ, СНАРУЖИ ФУТЕРА, СТАВИМ НАШ QR-КОД */}
+      <AnimatePresence>
+        {showPayQR && (
+          <>
+            {/* Темный фон на весь экран */}
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowPayQR(false)} 
+              style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(4px)', zIndex: 90 }}
+            />
+
+            {/* Само окно (ПО ЦЕНТРУ, НО ВЫЕЗЖАЕТ СНИЗУ) */}
+            <motion.div
+              // МАГИЯ АНИМАЦИИ: 
+              // Начинает снизу за экраном (y: '100vh')
+              initial={{ opacity: 0, x: '-50%', y: '100vh' }} 
+              // Прилетает ровно в центр (y: '-50%')
+              animate={{ opacity: 1, x: '-50%', y: '-50%' }} 
+              // Уезжает обратно вниз при закрытии
+              exit={{ opacity: 0, x: '-50%', y: '100vh' }} 
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              style={{
+                position: 'fixed', 
+                top: '50%', // Центрирование
+                left: '50%', // Центрирование
+                
+                width: 'calc(100% - 32px)', 
+                maxWidth: '360px', 
+                maxHeight: 'calc(100vh - 90px)', 
+                overflowY: 'auto', 
+                
+                backgroundColor: 'rgba(10, 10, 10, 0.95)', 
+                backdropFilter: 'blur(20px)',
+                zIndex: 100, 
+                borderRadius: '24px', 
+                padding: '32px 24px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', 
+                border: '1px solid rgba(6, 182, 212, 0.5)',
+                boxShadow: '0 0 50px rgba(0,0,0,0.8)' 
+              }}
+            >
+              {/* Кнопка закрытия */}
+              <button onClick={() => setShowPayQR(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer' }}>
+                <X size={24} />
+              </button>
+
+              <h3 style={{ color: '#ffffff', fontSize: '18px', fontWeight: 700, margin: '0 0 8px 0' }}>Scan to Pay</h3>
+              <p style={{ color: '#9ca3af', fontSize: '12px', textAlign: 'center', marginBottom: '24px', maxWidth: '250px' }}>
+                Scan this QR with Binance, Bybit, or any crypto app to send exactly <strong style={{color: '#06b6d4'}}>{total} USDC</strong>.
+              </p>
+
+              {/* === УМНЫЙ БЛОК С ЗАГРУЗКОЙ === */}
+              {isFetchingAddress ? (
+                // ПОКА ГРУЗИТСЯ — ПОКАЗЫВАЕМ АНИМАЦИЮ
+                <div style={{ padding: '40px', color: '#06b6d4', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <Zap size={32} style={{ animation: 'pulse 2s infinite', marginBottom: '16px' }} />
+                  <p style={{ fontSize: '14px', margin: 0 }}>Generating secure address...</p>
+                </div>
+              ) : (
+                // КОГДА ЗАГРУЗИЛОСЬ И АДРЕС ЕСТЬ — ПОКАЗЫВАЕМ QR
+                depositAddress && (
+                  <>
+                    <div style={{ backgroundColor: '#ffffff', padding: '16px', borderRadius: '16px', boxShadow: '0 0 30px rgba(6, 182, 212, 0.3)', marginBottom: '24px' }}>
+                      <QRCodeSVG value={depositAddress} size={180} fgColor="#000000" bgColor="#ffffff" />
+                    </div>
+
+                    <div style={{ backgroundColor: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '12px', width: '100%', textAlign: 'center' }}>
+                      <p style={{ color: '#9ca3af', fontSize: '10px', margin: '0 0 4px 0', textTransform: 'uppercase' }}>Store Polygon Address</p>
+                      <p style={{ color: '#cffafe', fontSize: '11px', fontFamily: 'monospace', margin: 0, wordBreak: 'break-all' }}>
+                        {depositAddress}
+                      </p>
+                    </div>
+                  </>
+                )
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+    </> // 3. Закрываем пустой тег (Fragment) в самом конце
   );
 }

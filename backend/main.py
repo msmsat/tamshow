@@ -8,7 +8,7 @@ from database import engine, get_db
 from models import Base
 
 # 1. ИМПОРТИРУЕМ НАШИ РОУТЕРЫ ИЗ ПАПКИ
-from routers import wallet, ai_chat
+from routers import wallet, ai_chat, socket_wallet
 from routers.cart import router as cart_router
 
 @asynccontextmanager
@@ -39,6 +39,7 @@ app.add_middleware(
 app.include_router(wallet.router)
 app.include_router(ai_chat.router)
 app.include_router(cart_router)  # Подключаем роутер корзины
+app.include_router(socket_wallet.router) # <-- Подключили сокеты
 # ==========================================
 # 🛠 БАЗОВЫЕ ТЕСТОВЫЕ ЭНДПОИНТЫ
 # ==========================================

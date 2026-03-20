@@ -8,6 +8,17 @@ from sqlalchemy import select
 from database import get_db
 from models import User
 
+import os
+from cryptography.fernet import Fernet
+from dotenv import load_dotenv
+
+load_dotenv() # Загружаем переменные из .env
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
+if not ENCRYPTION_KEY:
+    raise ValueError("🚨 ВНИМАНИЕ: ENCRYPTION_KEY не найден в файле .env!")
+    
+cipher_suite = Fernet(ENCRYPTION_KEY.encode())
+
 
 # Ваш роутер! Мы сразу говорим, что все пути тут начинаются с /api/wallet
 router = APIRouter(
@@ -168,3 +179,61 @@ async def disconnect_wallet(req: WalletDisconnectRequest, db: AsyncSession = Dep
     except Exception as e:
         print(f"❌ Ошибка БД при удалении кошелька: {e}")
         return {"success": False, "error": str(e)}
+
+@router.get("/get-address")
+async def get_deposit_address(tg_id: str, db: AsyncSession = Depends(get_db)):
+    print(f"🔥 [БЭКЕНД] Пришел запрос от фронтенда!")
+    print(f"👀 Ищем Polygon-адрес для юзера: {tg_id}")
+    
+    try:
+        # 1. Ищем юзера в базе
+        query = select(User).where(User.telegram_id == tg_id)
+        result = await db.execute(query)
+        user = result.scalar_one_or_none()
+
+        # 2. Если адрес уже есть — отдаем его (чтобы не плодить кошельки)
+        if user and user.deposit_address:
+            print(f"✅ Нашли адрес в БД: {user.deposit_address}")
+            return {
+                "status": "success",
+                "address": user.deposit_address
+            }
+
+        # 3. Если адреса нет — ГЕНЕРИРУЕМ РЕАЛЬНЫЙ КОШЕЛЕК
+        print("⚠️ Адрес не найден. Генерируем реальный Web3 кошелек...")
+        
+        # 🪄 Магия Web3.py
+        new_wallet = w3.eth.account.create()
+        new_address = new_wallet.address
+        private_key = new_wallet.key.hex() # Получаем ключ в виде строки (hex)
+        encrypted_private_key = cipher_suite.encrypt(private_key.encode()).decode() # Шифруем ключ для безопасного хранения в БД
+
+        if user:
+            # Юзер есть, кладем адрес и зашифрованный ключ на его полки
+            user.deposit_address = new_address
+            user.deposit_private_key = encrypted_private_key
+        else:
+            # Юзера нет, создаем полностью
+            new_user = User(
+                telegram_id=tg_id, 
+                deposit_address=new_address,
+                deposit_private_key=encrypted_private_key
+            )
+            db.add(new_user)
+
+        # 4. Сохраняем в базу!
+        await db.commit()
+        print(f"💾 УСПЕХ! Сгенерирован боевой кошелек: {new_address}")
+        # print(f"Ключ: {private_key}") # НИКОГДА не принтуй ключ в боевом сервере!
+
+        return {
+            "status": "success",
+            "address": new_address
+        }
+        
+    except Exception as e:
+        print(f"❌ Ошибка БД при генерации адреса: {e}")
+        return {
+            "status": "error",
+            "address": None
+        }
