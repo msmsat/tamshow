@@ -8,12 +8,16 @@ from sqlalchemy import select
 from database import get_db
 from models import User
 
+import httpx
 import os
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 
 load_dotenv() # Загружаем переменные из .env
 ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
+# Подгружаем ключи (убедись, что они есть в .env)
+ALCHEMY_AUTH_TOKEN = os.getenv("ALCHEMY_AUTH_TOKEN")
+ALCHEMY_WEBHOOK_ID = os.getenv("ALCHEMY_WEBHOOK_ID")
 if not ENCRYPTION_KEY:
     raise ValueError("🚨 ВНИМАНИЕ: ENCRYPTION_KEY не найден в файле .env!")
     
@@ -237,3 +241,96 @@ async def get_deposit_address(tg_id: str, db: AsyncSession = Depends(get_db)):
             "status": "error",
             "address": None
         }
+
+
+@router.get("/sync-alchemy")
+async def sync_deactive_addresses_with_check(db: AsyncSession = Depends(get_db)):
+    print("🔍 Ищем кандидатов на синхронизацию...")
+    
+    # Проверяем, настроены ли ключи
+    if not ALCHEMY_AUTH_TOKEN or not ALCHEMY_WEBHOOK_ID:
+        return {"status": "error", "message": "Не настроены ключи Alchemy в .env файле!"}
+        
+    try:
+        # 1. Достаем deactive юзеров из БД
+        query = select(User).where(
+            User.address_status == "deactive",
+            User.deposit_address.is_not(None),
+            User.deposit_address.like("0x%")
+        )
+        result = await db.execute(query)
+        users_to_sync = result.scalars().all()
+        
+        if not users_to_sync:
+            return {"status": "empty", "message": "Нет новых юзеров для синхронизации"}
+
+        # 2. Собираем адреса, которые хотим добавить
+        addresses_to_add = [u.deposit_address for u in users_to_sync]
+        print(f"📦 Нашли {len(addresses_to_add)} адресов в БД. Проверяем Alchemy...")
+
+        # ==========================================
+        # 🛡 ШАГ ЗАЩИТЫ: ПРОВЕРЯЕМ ALCHEMY
+        # ==========================================
+        headers = {
+            "X-Alchemy-Token": ALCHEMY_AUTH_TOKEN,
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            # А. Получаем текущий список адресов из Alchemy
+            get_url = f"https://dashboard.alchemy.com/api/webhook-addresses?webhook_id={ALCHEMY_WEBHOOK_ID}&limit=100"
+            get_response = await client.get(get_url, headers=headers)
+            
+            if get_response.status_code != 200:
+                print(f"❌ Ошибка при чтении списка Alchemy: {get_response.text}")
+                return {"status": "error", "message": "Не удалось получить список адресов от Alchemy"}
+                
+            alchemy_data = get_response.json()
+            # Переводим все адреса из Alchemy в нижний регистр для точного сравнения
+            existing_alchemy_addresses = [addr.lower() for addr in alchemy_data.get("addresses", [])]
+            
+            # Б. Сравниваем наши адреса со списком Alchemy
+            for addr in addresses_to_add:
+                if addr.lower() in existing_alchemy_addresses:
+                    print(f"⛔️ КРИТИЧЕСКАЯ ОШИБКА: Адрес {addr} УЖЕ ЕСТЬ в Alchemy!")
+                    # Как ты и просил — возвращаем ошибку и останавливаем процесс
+                    return {
+                        "status": "error", 
+                        "message": f"Конфликт! Адрес {addr} уже отслеживается в Alchemy."
+                    }
+
+            print("✅ Проверка пройдена: дубликатов в Alchemy не найдено.")
+
+            # ==========================================
+            # 🚀 ШАГ ОТПРАВКИ: ДОБАВЛЯЕМ В ALCHEMY
+            # ==========================================
+            patch_url = "https://dashboard.alchemy.com/api/update-webhook-addresses"
+            payload = {
+                "webhook_id": ALCHEMY_WEBHOOK_ID,
+                "addresses_to_add": addresses_to_add,
+                "addresses_to_remove": []
+            }
+            
+            patch_response = await client.patch(patch_url, json=payload, headers=headers)
+            
+            if patch_response.status_code == 200:
+                # В. Если Alchemy ответил "ОК", меняем статус в базе на 'active'
+                for user in users_to_sync:
+                    user.address_status = "active"
+                
+                await db.commit()
+                print(f"🎉 УСПЕХ! {len(addresses_to_add)} адресов добавлены в вебхук Alchemy.")
+                
+                return {
+                    "status": "success", 
+                    "synced_count": len(addresses_to_add),
+                    "addresses": addresses_to_add
+                }
+            else:
+                print(f"❌ Ошибка при добавлении в Alchemy: {patch_response.text}")
+                return {"status": "error", "message": "Сбой при записи адресов в Alchemy"}
+
+    except Exception as e:
+        print(f"❌ Системная ошибка: {e}")
+        return {"status": "error", "message": str(e)}
