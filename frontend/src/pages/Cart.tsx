@@ -455,6 +455,10 @@ export function CheckoutFooter() {
   const [depositAddress, setDepositAddress] = useState(''); // Сюда положим адрес от Питона
   const [isFetchingAddress, setIsFetchingAddress] = useState(false); // Статус загрузки
   const tgId = "620994031"; // Временно хардкодим tgId (как ты делал выше в Cart)
+  const [balance, setBalance] = useState<number | null>(null);
+  const [canPay, setCanPay] = useState<boolean>(false);
+  const [backendTotal, setBackendTotal] = useState<number | null>(null);
+  const [isSuccess, setIsSuccess] = useState(false); // Состояние "Успешно оплачено"
   
   // === СЛУШАЕМ ОТКРЫТИЕ ЧЕКА ===
   // Как только isExpanded меняется на true, сразу дергаем бэкенд
@@ -497,6 +501,41 @@ export function CheckoutFooter() {
       setIsFetchingAddress(false);
     }
   };
+
+  // === ФУНКЦИЯ ПРОВЕРКИ БАЛАНСА (С АЛЕРТАМИ) ===
+  const checkBalance = async () => {
+    setIsFetchingAddress(true); 
+    
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/cart/checkout-preview/${tgId}`);
+      if (!response.ok) throw new Error('Network error');
+      
+      const data = await response.json();
+      
+      // 1. Сохраняем данные без ошибок (теперь React знает эти set-функции)
+      setBalance(data.internal_balance || 0); 
+      setCanPay(data.can_pay || false); 
+      setBackendTotal(data.calculated_total || 0);
+      setDepositAddress(data.deposit_address || ''); 
+      
+      // 2. Выводим Алерты, как ты просил
+      if (data.can_pay) {
+        console.log(`✅ Денег хватает! На балансе: $${data.internal_balance}`);
+      } else {
+        console.log(`❌ Денег НЕ хватает! Баланс: $${data.internal_balance}, а нужно: $${data.calculated_total}`);
+      }
+
+    } catch (error) {
+      console.error("Ошибка при проверке баланса:", error);
+      alert("❌ Ошибка соединения с сервером!");
+    } finally {
+      setIsFetchingAddress(false);
+    }
+  };
+
+  useEffect(() => {
+    checkBalance();
+  }, []);
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const discount = walletAddress ? Math.round(subtotal * 0.2) : 0;
@@ -681,15 +720,16 @@ export function CheckoutFooter() {
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => {
-             if (!isExpanded) {
-                 setIsExpanded(true); // Открываем чек
-             } else {
-                 if (!receiverAddress) {
-                     alert("Please enter a receiver address first!");
-                     return;
-                 }
-                 console.log(`🚀 Отправляем счет на адрес: ${receiverAddress}`);
-             }
+            if (!isExpanded) {
+                setIsExpanded(true); // Открываем чек
+            } else {
+                checkBalance();
+                if (!receiverAddress) {
+                    alert("Please enter a receiver address first!");
+                    return;
+                }
+                console.log(`🚀 Отправляем счет на адрес: ${receiverAddress}`);
+            }
           }}
           style={{
              /* твои текущие стили оставляй без изменений */

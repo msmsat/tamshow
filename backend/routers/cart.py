@@ -5,7 +5,7 @@ from sqlalchemy.future import select
 
 # Импортируем вашу функцию для БД и новую модель
 from database import get_db
-from models import CartItem
+from models import CartItem, User, Product
 
 # Создаем роутер с префиксом, чтобы не писать /api/cart каждый раз
 router = APIRouter(
@@ -28,6 +28,10 @@ class CartUpdateRequest(BaseModel):
 class CartRemoveRequest(BaseModel):
     tg_id: str
     product_id: str
+
+class CheckoutPayRequest(BaseModel):
+    tg_id: str
+    total_amount: float
 
 # ================= ЭНДПОИНТЫ =================
 
@@ -112,3 +116,91 @@ async def remove_from_cart(req: CartRemoveRequest, db: AsyncSession = Depends(ge
         return {"success": True}
 
     return {"success": False, "error": "Item not found"}
+
+# =======================================================
+# 5. ПРЕДПРОСМОТР БАЛАНСА ПЕРЕД ОПЛАТОЙ
+# =======================================================
+@router.get("/checkout-preview/{tg_id}")
+async def checkout_preview(tg_id: str, db: AsyncSession = Depends(get_db)):
+    # 1. Ищем или создаем юзера
+    query = select(User).where(User.telegram_id == tg_id)
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        user = User(telegram_id=tg_id, internal_balance=0.0)
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    # 2. ДОСТАЕМ КОРЗИНУ И СЧИТАЕМ СУММУ САМИ
+    cart_query = select(CartItem, Product).join(
+        Product, CartItem.product_id == Product.shopify_id
+    ).where(CartItem.telegram_id == tg_id)
+    
+    cart_result = await db.execute(cart_query)
+    items_with_products = cart_result.all()
+
+    # 🛑 ЖЕСТКАЯ ПРОВЕРКА НА ПУСТУЮ КОРЗИНУ 🛑
+    if not items_with_products:
+        return {
+            "can_pay": False, # Запрещаем оплату
+            "internal_balance": user.internal_balance,
+            "deposit_address": user.deposit_address or "",
+            "calculated_total": 0.0,
+            "message": "Ошибка: Корзина пуста или товары не найдены в базе данных!"
+        }
+
+    # Считаем "грязную" сумму
+    subtotal = 0.0
+    for cart_item, product in items_with_products:
+        subtotal += product.price * cart_item.quantity
+
+    # Применяем скидки и комиссии
+    discount = round(subtotal * 0.2) if user.wallet_address else 0
+    network_fee = round(subtotal * 0.05)
+    total_calculated = subtotal - discount + network_fee
+
+    # 3. Проверяем, хватает ли денег
+    can_pay = user.internal_balance >= total_calculated
+
+    return {
+        "can_pay": can_pay, 
+        "internal_balance": user.internal_balance,
+        "deposit_address": user.deposit_address or "",
+        "calculated_total": total_calculated, # Отдаем фронту то, что насчитали
+        "message": "Успешный подсчет" 
+    }
+
+# =======================================================
+# 6. ФИНАЛЬНАЯ ОПЛАТА С БАЛАНСА
+# =======================================================
+@router.post("/pay")
+async def process_payment(req: CheckoutPayRequest, db: AsyncSession = Depends(get_db)):
+    # 1. Ищем юзера
+    query = select(User).where(User.telegram_id == req.tg_id)
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        return {"success": False, "error": "Пользователь не найден"}
+
+    # 2. Проверяем, хватает ли денег
+    if user.internal_balance < req.total_amount:
+        return {"success": False, "error": "Недостаточно средств на балансе"}
+
+    # 3. Списываем деньги
+    user.internal_balance -= req.total_amount
+
+    # 4. Очищаем корзину (удаляем все товары этого юзера из БД)
+    cart_query = select(CartItem).where(CartItem.telegram_id == req.tg_id)
+    cart_result = await db.execute(cart_query)
+    cart_items = cart_result.scalars().all()
+    
+    for item in cart_items:
+        await db.delete(item)
+
+    # 5. Сохраняем изменения
+    await db.commit()
+    
+    return {"success": True, "new_balance": user.internal_balance}

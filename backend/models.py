@@ -20,6 +20,7 @@ class User(Base):
     deposit_private_key: Mapped[Optional[str]] = mapped_column(String)
     email: Mapped[Optional[str]] = mapped_column(String, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    internal_balance: Mapped[float] = mapped_column(Float, default=0.0)
 
     # Связи
     subscriptions: Mapped[List["Subscription"]] = relationship(back_populates="user")
@@ -71,7 +72,7 @@ class Order(Base):
     items: Mapped[List["OrderItem"]] = relationship(back_populates="order")
     transactions: Mapped[List["Transaction"]] = relationship(back_populates="order")
 
-# 5️⃣ Элементы заказа (order_items)
+
 class OrderItem(Base):
     __tablename__ = "order_items"
 
@@ -80,6 +81,10 @@ class OrderItem(Base):
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
     quantity: Mapped[int] = mapped_column(Integer, default=1)
     price: Mapped[float] = mapped_column(Float)
+    
+    # 📦 НОВОЕ ПОЛЕ: Статус конкретного товара в заказе
+    # Статусы: "PAID_NOT_DELIVERED" (оплачено, ждет выдачи), "DELIVERED" (выдано), "REFUNDED"
+    status: Mapped[str] = mapped_column(String, default="PAID_NOT_DELIVERED")
 
     order: Mapped["Order"] = relationship(back_populates="items")
     product: Mapped["Product"] = relationship()

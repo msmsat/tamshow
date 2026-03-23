@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
-from backend.routers import webhook_wallet
+from routers import webhook_wallet
 from database import engine, get_db
 from models import Base
 

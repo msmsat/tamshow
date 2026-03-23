@@ -1,10 +1,22 @@
-from fastapi import APIRouter, Request, Header
+from fastapi import APIRouter, Request, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import json
+
+# Импортируем базу данных и модель юзера
+from database import get_db
+from models import User
 
 router = APIRouter(tags=["Alchemy Webhook"])
 
+# Стало (добавили prefix):
+router = APIRouter(
+    prefix="/api/webhook",
+    tags=["Alchemy Webhook"]
+)
+
 @router.post("/alchemy")
-async def alchemy_webhook(request: Request):
+async def alchemy_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     """
     Принимает уведомления от Alchemy о транзакциях в блокчейне.
     """
@@ -30,12 +42,42 @@ async def alchemy_webhook(request: Request):
             asset = activity.get("asset") # Например, 'USDC' или 'MATIC'
             tx_hash = activity.get("hash")
 
-            print("=" * 40)
-            print(f"💰 ОБНАРУЖЕН ПЕРЕВОД: {value} {asset}")
-            print(f"⬅️ Отправитель: {from_addr}")
-            print(f"➡️ Получатель (твой юзер): {to_addr}")
-            print(f"🔗 Хеш транзакции: {tx_hash}")
-            print("=" * 40)
+            print("\n" + "=" * 50)
+            print(f"🔔 НОВАЯ ТРАНЗАКЦИЯ: {value} {asset}")
+
+            # ==========================================
+            # 1. ПРАВИЛО №1: НЕПРАВИЛЬНАЯ ВАЛЮТА СГОРАЕТ
+            # ==========================================
+            if asset != "USDC":
+                print(f"🔥 ВАЛЮТА СГОРЕЛА: Юзер прислал {asset} вместо USDC.")
+                print(f"🔗 Транзакция: {tx_hash}")
+                print("Действие: Игнорируем перевод. Товар не выдается.")
+                print("=" * 50)
+                continue # Забываем про этот перевод и идем дальше
+
+            # ==========================================
+            # 2. ПОПОЛНЕНИЕ БАЛАНСА В БАЗЕ ДАННЫХ
+            # ==========================================
+            # Ищем пользователя по deposit_address (игнорируем регистр через ilike)
+            query = select(User).where(User.deposit_address.ilike(to_addr))
+            result = await db.execute(query)
+            user = result.scalar_one_or_none()
+
+            if user:
+                # Плюсуем пришедшую сумму на внутренний баланс
+                user.internal_balance += value
+                
+                # Сохраняем изменения в базу
+                await db.commit()
+                
+                print(f"✅ УСПЕХ: Пользователь {user.telegram_id} найден!")
+                print(f"💰 Зачислено: {value} USDC")
+                print(f"🏦 Новый баланс юзера: {user.internal_balance} USDC")
+            else:
+                print(f"⚠️ ОШИБКА: Пользователь с адресом {to_addr} не найден в БД!")
+                print("Деньги зависли на кошельке, но никому не зачислены.")
+
+            print("=" * 50)
 
         return {"status": "success"}
 
