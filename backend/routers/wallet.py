@@ -260,7 +260,6 @@ async def sync_deactive_addresses_with_check(db: AsyncSession = Depends(get_db))
         )
         result = await db.execute(query)
         users_to_sync = result.scalars().all()
-        
         if not users_to_sync:
             return {"status": "empty", "message": "Нет новых юзеров для синхронизации"}
 
