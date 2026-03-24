@@ -3,6 +3,9 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+import asyncio
+# Импортируем наш таймер из файла wallet.py
+from routers.wallet import periodic_audit_task # если wallet лежит в папке routers, или просто from wallet import...
 
 from routers import webhook_wallet
 from database import engine, get_db
@@ -18,8 +21,15 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     print("✅ База данных готова!")
+    
+    # 🔥 ЗАПУСКАЕМ ТАЙМЕР ПРЯМО ЗДЕСЬ!
+    print("⏰ Запускаем фоновые таймеры...")
+    audit_task = asyncio.create_task(periodic_audit_task())
+
     yield
-    # При выключении: закрываем соединения
+    
+    # При выключении: отключаем таймер и закрываем соединения
+    audit_task.cancel()
     await engine.dispose()
 
 # Инициализация FastAPI

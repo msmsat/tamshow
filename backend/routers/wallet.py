@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from web3 import Web3
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+import asyncio
 
 # Импортируем нашу базу данных и модель юзера
 from database import get_db
@@ -46,6 +47,89 @@ nft_contract = w3.eth.contract(address=NFT_CONTRACT_ADDRESS, abi=MINIMAL_ABI)
 USDC_CONTRACT_ADDRESS = w3.to_checksum_address("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174")
 usdc_contract = w3.eth.contract(address=USDC_CONTRACT_ADDRESS, abi=MINIMAL_ABI)
 # ==========================================
+
+# ==========================================
+# 1. САМА ЛОГИКА АУДИТА (Без @router)
+# ==========================================
+async def process_alchemy_audit(db: AsyncSession):
+    print("🔍 [АВТО] Начинаем полный аудит адресов между БД и Alchemy...")
+
+    if not ALCHEMY_AUTH_TOKEN or not ALCHEMY_WEBHOOK_ID:
+        print("❌ Не настроены ключи Alchemy!")
+        return
+
+    try:
+        # Достаем всех юзеров с адресами
+        query = select(User).where(User.deposit_address.is_not(None))
+        result = await db.execute(query)
+        all_users = result.scalars().all()
+
+        db_active_addresses = {u.deposit_address.lower(): u for u in all_users if u.address_status == "active"}
+
+        # Идем в Alchemy
+        headers = {
+            "X-Alchemy-Token": ALCHEMY_AUTH_TOKEN,
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            get_url = f"https://dashboard.alchemy.com/api/webhook-addresses?webhook_id={ALCHEMY_WEBHOOK_ID}&limit=100"
+            get_response = await client.get(get_url, headers=headers)
+            
+            if get_response.status_code != 200:
+                print("❌ Сбой при запросе к Alchemy")
+                return
+                
+            alchemy_data = get_response.json()
+            alchemy_addresses = {addr.lower() for addr in alchemy_data.get("addresses", [])}
+
+        # МАГИЯ СРАВНЕНИЯ
+        addresses_to_deactivate = set(db_active_addresses.keys()) - alchemy_addresses
+        for addr in addresses_to_deactivate:
+            user = db_active_addresses[addr]
+            user.address_status = "deactive"
+            print(f"📉 Исправлено: Статус изменен на deactive для {addr} (Пропал из Alchemy)")
+
+        addresses_to_remove_from_alchemy = alchemy_addresses - set(db_active_addresses.keys())
+
+        # ПРИМЕНЯЕМ ИЗМЕНЕНИЯ
+        if addresses_to_deactivate:
+            await db.commit()
+            
+        if addresses_to_remove_from_alchemy:
+            patch_url = "https://dashboard.alchemy.com/api/update-webhook-addresses"
+            payload = {
+                "webhook_id": ALCHEMY_WEBHOOK_ID,
+                "addresses_to_add": [],
+                "addresses_to_remove": list(addresses_to_remove_from_alchemy)
+            }
+            await client.patch(patch_url, json=payload, headers=headers)
+            print(f"🧹 Удалено {len(addresses_to_remove_from_alchemy)} лишних адресов из Alchemy!")
+
+        if not addresses_to_deactivate and not addresses_to_remove_from_alchemy:
+            print("✨ Аудит пройден: База и Alchemy синхронизированы!")
+
+        return {"status": "success"}
+
+    except Exception as e:
+        print(f"❌ Ошибка аудита: {e}")
+
+# ==========================================
+# 3. ФОНОВЫЙ ТАЙМЕР (Крутится бесконечно)
+# ==========================================
+async def periodic_audit_task():
+    while True:
+        print("\n⏰ [ТАЙМЕР] Ждем 5 минут перед следующим аудитом...")
+        await asyncio.sleep(300) # 300 секунд = ровно 5 минут
+        print("⏳ [ТАЙМЕР] Запускаем плановую проверку Alchemy...")
+        try:
+            # Берем базу данных точно так же, как делали в скрипте заливки товаров
+            async for db in get_db():
+                await process_alchemy_audit(db)
+                break # Выполнили 1 раз и прервали цикл получения БД
+        except Exception as e:
+            print(f"❌ Ошибка таймера: {e}")
 
 
 # ==========================================
@@ -198,6 +282,10 @@ async def get_deposit_address(tg_id: str, db: AsyncSession = Depends(get_db)):
         # 2. Если адрес уже есть — отдаем его (чтобы не плодить кошельки)
         if user and user.deposit_address:
             print(f"✅ Нашли адрес в БД: {user.deposit_address}")
+            # 🔥 НОВОЕ: ЕСЛИ АДРЕС СТАРЫЙ, НО DEACTIVE — ПРОБУЕМ СИНХРОНИЗИРОВАТЬ!
+            if user.address_status == "deactive":
+                print("🔄 Адрес deactive! Запускаем синхронизацию с Alchemy...")
+                await sync_deactive_addresses_with_check(db)
             return {
                 "status": "success",
                 "address": user.deposit_address
@@ -228,7 +316,11 @@ async def get_deposit_address(tg_id: str, db: AsyncSession = Depends(get_db)):
         # 4. Сохраняем в базу!
         await db.commit()
         print(f"💾 УСПЕХ! Сгенерирован боевой кошелек: {new_address}")
-        # print(f"Ключ: {private_key}") # НИКОГДА не принтуй ключ в боевом сервере!
+        
+        # 🔥 НОВОЕ: Сразу после создания кошелька дергаем нашу функцию синхронизации!
+        # Она найдет этот новый адрес со статусом "deactive" и отправит в Alchemy
+        print("🔄 Автоматически запускаем синхронизацию с Alchemy...")
+        await sync_deactive_addresses_with_check(db)
 
         return {
             "status": "success",
@@ -333,3 +425,12 @@ async def sync_deactive_addresses_with_check(db: AsyncSession = Depends(get_db))
     except Exception as e:
         print(f"❌ Системная ошибка: {e}")
         return {"status": "error", "message": str(e)}
+
+# ==========================================
+# 2. ЭНДПОИНТ (Если захочешь запустить руками по ссылке)
+# ==========================================
+@router.get("/audit-alchemy")
+async def audit_alchemy_sync(db: AsyncSession = Depends(get_db)):
+    # Просто вызывает логику выше
+    result = await process_alchemy_audit(db)
+    return result or {"status": "done"}

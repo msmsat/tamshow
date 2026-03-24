@@ -449,7 +449,7 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
 export function CheckoutFooter() {
   const [isExpanded, setIsExpanded] = useState(false);
   const { walletAddress } = useUserStore();
-  const { cart } = useCartStore();
+  const { cart, fetchCart } = useCartStore();
   const [receiverAddress, setReceiverAddress] = useState('');
   const [showPayQR, setShowPayQR] = useState(false);
   const [depositAddress, setDepositAddress] = useState(''); // Сюда положим адрес от Питона
@@ -459,6 +459,7 @@ export function CheckoutFooter() {
   const [canPay, setCanPay] = useState<boolean>(false);
   const [backendTotal, setBackendTotal] = useState<number | null>(null);
   const [isSuccess, setIsSuccess] = useState(false); // Состояние "Успешно оплачено"
+  const [isPaying, setIsPaying] = useState(false);
   
   // === СЛУШАЕМ ОТКРЫТИЕ ЧЕКА ===
   // Как только isExpanded меняется на true, сразу дергаем бэкенд
@@ -470,11 +471,9 @@ export function CheckoutFooter() {
 
   // === ВСТАВЛЯЕМ ТВОЮ ФУНКЦИЮ СЮДА ===
   const fetchAddressFromBackend = async () => {
-    // Если адрес уже получен ранее, просто убеждаемся, что он есть в инпуте, и выходим
-    if (depositAddress) {
-      if (!receiverAddress) setReceiverAddress(depositAddress);
-      return; 
-    }
+    // Мы убрали блокировку "if (depositAddress) return;"
+    // Теперь React ВСЕГДА будет стучаться на бэкенд при открытии чека,
+    // давая бэкенду шанс проверить статус (active/deactive) и починить его!
     
     setIsFetchingAddress(true);
     try {
@@ -487,16 +486,14 @@ export function CheckoutFooter() {
       const data = await response.json();
 
       if (data.status === 'success' && data.address) {
-        // Успех! Кладем адрес и для QR-кода, И В ИНПУТ
         setDepositAddress(data.address);
-        setReceiverAddress(data.address); // <-- ВОТ ЭТА МАГИЯ ВСТАВИТ ЕГО В ПОЛЕ
+        setReceiverAddress(data.address); 
       } else {
         console.error("Backend error:", data);
         alert("Failed to generate secure address. Try again.");
       }
     } catch (error) {
       console.error("Ошибка при получении адреса:", error);
-      alert("Failed to connect to Nexus servers. Is the backend running?");
     } finally {
       setIsFetchingAddress(false);
     }
@@ -530,6 +527,38 @@ export function CheckoutFooter() {
       alert("❌ Ошибка соединения с сервером!");
     } finally {
       setIsFetchingAddress(false);
+    }
+  };
+
+  // === ФУНКЦИЯ РЕАЛЬНОЙ ОПЛАТЫ ===
+  const handlePayment = async () => {
+    if (!canPay) return;
+    setIsPaying(true); // Включаем загрузку на кнопке
+    
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/cart/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          tg_id: tgId, 
+          // Отправляем сумму, которую посчитал бэкенд (или локальную, если бэкенд тупит)
+          total_amount: backendTotal !== null ? backendTotal : total 
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setIsSuccess(true); 
+        fetchCart(tgId, ALL_PRODUCTS); // Берем напрямую из импорта!
+      } else {
+        alert(`❌ Ошибка оплаты: ${data.error}`);
+      }
+    } catch (error) {
+      console.error("Ошибка при оплате:", error);
+      alert("❌ Сбой соединения с сервером.");
+    } finally {
+      setIsPaying(false);
     }
   };
 
@@ -626,78 +655,79 @@ export function CheckoutFooter() {
           willChange: 'height, opacity' // Подсказка браузеру: заранее включи видеокарту для этого блока
         }}
       >
-        <div style={{ 
-          paddingBottom: '16px', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '8px' 
-        }}>
-          {/* Subtotal */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-            <span style={{ color: '#9ca3af' }}>Subtotal</span>
-            <span style={{ color: '#d1d5db', fontWeight: 600 }}>${subtotal}</span>
-          </div>
+        <div style={{ paddingBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           
-          {/* Network Fee */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-            <span style={{ color: '#9ca3af' }}>Network Fee</span>
-            <span style={{ color: '#d1d5db', fontWeight: 600 }}>${networkFee}</span>
-          </div>
-          
-          {/* VIP Discount */}
-          {discount > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-              <span style={{ color: '#22c55e' }}>VIP Discount</span>
-              <span style={{ color: '#22c55e', fontWeight: 600 }}>-${discount}</span>
-            </div>
-          )}
-          
-          <div style={{ height: '1px', backgroundColor: 'rgba(255, 255, 255, 0.1)', margin: '8px 0' }} />
-
-          {/* НОВОЕ: Поле ввода адреса TON */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-            <label style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 600, paddingLeft: '4px' }}>
-              Receiver Wallet Address
-            </label>
-            
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(23, 23, 23, 0.6)', 
-              backdropFilter: 'blur(12px)', border: '1px solid rgba(168, 85, 247, 0.3)', 
-              borderRadius: '14px', padding: '12px 16px', boxShadow: 'inset 0 0 10px rgba(0,0,0,0.5)'
-            }}>
-              <input
-                type="text"
-                value={receiverAddress}
-                onChange={(e) => setReceiverAddress(e.target.value)}
-                placeholder="Enter TON Address"
-                style={{
-                  flex: 1, backgroundColor: 'transparent', border: 'none', color: '#ffffff', 
-                  fontSize: '13px', outline: 'none', width: '100%', fontFamily: 'monospace'
-                }}
-              />
+          {isSuccess ? (
+            // === ЭКРАН УСПЕХА ===
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+              style={{ padding: '24px', textAlign: 'center', backgroundColor: 'rgba(34, 197, 94, 0.1)', borderRadius: '16px', border: '1px solid rgba(34, 197, 94, 0.3)' }}
+            >
+              <div style={{ width: '48px', height: '48px', backgroundColor: '#22c55e', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                <ShieldCheck size={24} color="#ffffff" />
+              </div>
+              <h3 style={{ color: '#ffffff', fontSize: '18px', margin: '0 0 8px' }}>Payment Successful!</h3>
+              <p style={{ color: '#86efac', fontSize: '12px', margin: 0 }}>Items have been added to your inventory.</p>
+            </motion.div>
+          ) : (
+            // === ОБЫЧНЫЙ ЭКРАН ЧЕКА (Оставляем твой старый код внутри) ===
+            <>
+              {/* Subtotal */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                <span style={{ color: '#9ca3af' }}>Subtotal</span>
+                <span style={{ color: '#d1d5db', fontWeight: 600 }}>${subtotal}</span>
+              </div>
               
-              <motion.button 
-                whileHover={{ scale: 1.1, color: '#06b6d4' }}
-                whileTap={{ scale: 0.9 }}
-                style={{
-                  background: 'none', border: 'none', color: '#a855f7', 
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px'
-                }}
-                // МЕНЯЕМ ЗДЕСЬ:
-                onClick={() => setShowPayQR(true)}
-              >
-                <QrCode size={20} />
-              </motion.button>
-            </div>
+              {/* Network Fee */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                <span style={{ color: '#9ca3af' }}>Network Fee</span>
+                <span style={{ color: '#d1d5db', fontWeight: 600 }}>${networkFee}</span>
+              </div>
+              
+              {/* VIP Discount */}
+              {discount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                  <span style={{ color: '#22c55e' }}>VIP Discount</span>
+                  <span style={{ color: '#22c55e', fontWeight: 600 }}>-${discount}</span>
+                </div>
+              )}
+              
+              <div style={{ height: '1px', backgroundColor: 'rgba(255, 255, 255, 0.1)', margin: '8px 0' }} />
 
-            {/* Кибер-предупреждение */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', paddingLeft: '4px', marginTop: '4px' }}>
-              <Zap size={14} color="#06b6d4" style={{ flexShrink: 0, marginTop: '1px' }} />
-              <p style={{ fontSize: '11px', color: '#06b6d4', margin: 0, lineHeight: '1.4', opacity: 0.8 }}>
-                Nexus items are deployed on the <strong>Polygon Network</strong>. Please ensure the address is a valid EVM wallet starting with <strong>0x...</strong>
-              </p>
-            </div>
-          </div>
+              {/* === БЛОК ПРОВЕРКИ БАЛАНСА === */}
+              {isFetchingAddress ? (
+                <div style={{ textAlign: 'center', padding: '10px', color: '#06b6d4', fontSize: '12px' }}>Checking Nexus Balance...</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '12px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px', marginTop: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#9ca3af', fontSize: '13px' }}>Your Balance:</span>
+                    <span style={{ color: '#ffffff', fontWeight: 'bold', fontSize: '14px' }}>${balance?.toFixed(2)} USDC</span>
+                  </div>
+
+                  {canPay ? (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(34, 197, 94, 0.1)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+                      <span style={{ color: '#86efac', fontSize: '12px' }}>After payment:</span>
+                      <span style={{ color: '#22c55e', fontWeight: 'bold', fontSize: '13px' }}>+${(balance! - (backendTotal !== null ? backendTotal : total)).toFixed(2)} USDC</span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#fca5a5', fontSize: '12px' }}>Missing funds:</span>
+                        <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '13px' }}>-${((backendTotal !== null ? backendTotal : total) - balance!).toFixed(2)} USDC</span>
+                      </div>
+                      <button 
+                        onClick={() => setShowPayQR(true)} 
+                        style={{ backgroundColor: '#ef4444', border: 'none', borderRadius: '6px', color: '#fff', padding: '8px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                      >
+                        <QrCode size={14} /> Deposit to Balance
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
         </div>
         
       </motion.div>
@@ -718,28 +748,39 @@ export function CheckoutFooter() {
         </div>
 
         <motion.button
-          whileTap={{ scale: 0.95 }}
+          whileTap={{ scale: (!isExpanded || canPay || isSuccess) ? 0.95 : 1 }}
           onClick={() => {
-            if (!isExpanded) {
-                setIsExpanded(true); // Открываем чек
-            } else {
-                checkBalance();
-                if (!receiverAddress) {
-                    alert("Please enter a receiver address first!");
-                    return;
-                }
-                console.log(`🚀 Отправляем счет на адрес: ${receiverAddress}`);
-            }
+             if (isSuccess) {
+                 // Если уже оплачено - закрываем чек и сбрасываем статус
+                 setIsExpanded(false);
+                 setTimeout(() => setIsSuccess(false), 500); 
+             } else if (!isExpanded) {
+                 setIsExpanded(true); // Открываем чек
+             } else if (canPay && !isPaying) {
+                 // НАЖИМАЕМ ОПЛАТИТЬ!
+                 handlePayment(); 
+             }
           }}
+          disabled={isExpanded && !canPay && !isSuccess}
           style={{
-             /* твои текущие стили оставляй без изменений */
-             flex: 1, height: '48px', backgroundImage: 'linear-gradient(to right, rgba(168, 85, 247, 0.9), rgba(59, 130, 246, 0.9))',
-             border: 'none', borderRadius: '12px', color: '#ffffff', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-             boxShadow: '0 0 20px rgba(168, 85, 247, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+             flex: 1, height: '48px', 
+             background: (isExpanded && !canPay && !isSuccess) ? '#374151' : 'linear-gradient(to right, rgba(168, 85, 247, 0.9), rgba(59, 130, 246, 0.9))',
+             border: 'none', borderRadius: '12px', 
+             color: (isExpanded && !canPay && !isSuccess) ? '#9ca3af' : '#ffffff', 
+             fontSize: '13px', fontWeight: 700, 
+             cursor: (isExpanded && !canPay && !isSuccess) ? 'not-allowed' : 'pointer',
+             boxShadow: (isExpanded && !canPay && !isSuccess) ? 'none' : '0 0 20px rgba(168, 85, 247, 0.4)', 
+             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+             transition: 'all 0.3s'
           }}
         >
-          <span>{isExpanded ? 'Confirm Payment' : 'Checkout'}</span>
-          <ArrowRight size={14} />
+          <span>
+            {isPaying ? 'Processing...' : 
+              isSuccess ? 'Close Receipt' : 
+                (isExpanded ? (canPay ? 'Confirm & Pay' : 'Insufficient Balance') : 'Checkout')
+            }
+          </span>
+          {!isPaying && !isSuccess && canPay && <ArrowRight size={14} />}
         </motion.button>
       </motion.div>
     </motion.div>
