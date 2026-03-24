@@ -450,7 +450,6 @@ export function CheckoutFooter() {
   const [isExpanded, setIsExpanded] = useState(false);
   const { walletAddress } = useUserStore();
   const { cart, fetchCart } = useCartStore();
-  const [receiverAddress, setReceiverAddress] = useState('');
   const [showPayQR, setShowPayQR] = useState(false);
   const [depositAddress, setDepositAddress] = useState(''); // Сюда положим адрес от Питона
   const [isFetchingAddress, setIsFetchingAddress] = useState(false); // Статус загрузки
@@ -487,7 +486,6 @@ export function CheckoutFooter() {
 
       if (data.status === 'success' && data.address) {
         setDepositAddress(data.address);
-        setReceiverAddress(data.address); 
       } else {
         console.error("Backend error:", data);
         alert("Failed to generate secure address. Try again.");

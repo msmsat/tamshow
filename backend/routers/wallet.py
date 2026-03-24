@@ -64,6 +64,7 @@ async def process_alchemy_audit(db: AsyncSession):
         result = await db.execute(query)
         all_users = result.scalars().all()
 
+        # Собираем только активные адреса из БД (в нижнем регистре для точного сравнения)
         db_active_addresses = {u.deposit_address.lower(): u for u in all_users if u.address_status == "active"}
 
         # Идем в Alchemy
@@ -73,43 +74,67 @@ async def process_alchemy_audit(db: AsyncSession):
             "Content-Type": "application/json"
         }
         
+        # 👇 НАЧАЛО БЛОКА HTTP-КЛИЕНТА
         async with httpx.AsyncClient() as client:
             get_url = f"https://dashboard.alchemy.com/api/webhook-addresses?webhook_id={ALCHEMY_WEBHOOK_ID}&limit=100"
             get_response = await client.get(get_url, headers=headers)
             
             if get_response.status_code != 200:
-                print("❌ Сбой при запросе к Alchemy")
+                print(f"❌ Сбой при запросе к Alchemy: {get_response.text}")
                 return
                 
             alchemy_data = get_response.json()
-            alchemy_addresses = {addr.lower() for addr in alchemy_data.get("addresses", [])}
-
-        # МАГИЯ СРАВНЕНИЯ
-        addresses_to_deactivate = set(db_active_addresses.keys()) - alchemy_addresses
-        for addr in addresses_to_deactivate:
-            user = db_active_addresses[addr]
-            user.address_status = "deactive"
-            print(f"📉 Исправлено: Статус изменен на deactive для {addr} (Пропал из Alchemy)")
-
-        addresses_to_remove_from_alchemy = alchemy_addresses - set(db_active_addresses.keys())
-
-        # ПРИМЕНЯЕМ ИЗМЕНЕНИЯ
-        if addresses_to_deactivate:
-            await db.commit()
             
-        if addresses_to_remove_from_alchemy:
-            patch_url = "https://dashboard.alchemy.com/api/update-webhook-addresses"
-            payload = {
-                "webhook_id": ALCHEMY_WEBHOOK_ID,
-                "addresses_to_add": [],
-                "addresses_to_remove": list(addresses_to_remove_from_alchemy)
-            }
-            await client.patch(patch_url, json=payload, headers=headers)
-            print(f"🧹 Удалено {len(addresses_to_remove_from_alchemy)} лишних адресов из Alchemy!")
+            # 🕵️‍♂️ ДЕТЕКТИВНЫЕ ПРИНТЫ (ШАГ 1): Смотрим сырой ответ от Alchemy
+            print("\n" + "="*50)
+            print(f"📦 СЫРОЙ ОТВЕТ ALCHEMY: {alchemy_data}")
+            
+            # Alchemy может прятать список в ключе "data" или "addresses". Пробуем оба!
+            raw_addresses_list = alchemy_data.get("data", alchemy_data.get("addresses", []))
+            
+            alchemy_addresses = {addr.lower() for addr in raw_addresses_list}
+            
+            # 🕵️‍♂️ ДЕТЕКТИВНЫЕ ПРИНТЫ (ШАГ 2): Смотрим, что скрипт понял
+            print(f"🟢 Адреса в БД (активные)  : {list(db_active_addresses.keys())}")
+            print(f"🟠 Адреса в Alchemy (понятые): {list(alchemy_addresses)}")
+            
+            # Вычисляем, кого удалять
+            addresses_to_deactivate = set(db_active_addresses.keys()) - alchemy_addresses
+            addresses_to_remove_from_alchemy = alchemy_addresses - set(db_active_addresses.keys())
+            
+            # 🕵️‍♂️ ДЕТЕКТИВНЫЕ ПРИНТЫ (ШАГ 3): Смотрим математику
+            print(f"🔴 На удаление из Alchemy  : {list(addresses_to_remove_from_alchemy)}")
+            print(f"🟡 На деактивацию в БД     : {list(addresses_to_deactivate)}")
+            print("="*50 + "\n")
 
-        if not addresses_to_deactivate and not addresses_to_remove_from_alchemy:
-            print("✨ Аудит пройден: База и Alchemy синхронизированы!")
+            # ПРИМЕНЯЕМ ИЗМЕНЕНИЯ (Оставляем как было)
+            for addr in addresses_to_deactivate:
+                user = db_active_addresses[addr]
+                user.address_status = "deactive"
+                print(f"📉 Исправлено: Статус изменен на deactive для {addr}")
 
+            if addresses_to_deactivate:
+                await db.commit()
+                
+            if addresses_to_remove_from_alchemy:
+                patch_url = "https://dashboard.alchemy.com/api/update-webhook-addresses"
+                payload = {
+                    "webhook_id": ALCHEMY_WEBHOOK_ID,
+                    "addresses_to_add": [],
+                    "addresses_to_remove": list(addresses_to_remove_from_alchemy)
+                }
+                patch_response = await client.patch(patch_url, json=payload, headers=headers)
+                
+                if patch_response.status_code == 200:
+                    print(f"🧹 Удалено {len(addresses_to_remove_from_alchemy)} лишних адресов из Alchemy!")
+                else:
+                    print(f"❌ Ошибка при удалении из Alchemy: {patch_response.text}")
+
+            if not addresses_to_deactivate and not addresses_to_remove_from_alchemy:
+                print("✨ Аудит пройден: База и Alchemy полностью синхронизированы!")
+
+        # 👆 КОНЕЦ БЛОКА HTTP-КЛИЕНТА
+        
         return {"status": "success"}
 
     except Exception as e:
@@ -121,7 +146,7 @@ async def process_alchemy_audit(db: AsyncSession):
 async def periodic_audit_task():
     while True:
         print("\n⏰ [ТАЙМЕР] Ждем 5 минут перед следующим аудитом...")
-        await asyncio.sleep(300) # 300 секунд = ровно 5 минут
+        await asyncio.sleep(5) # 300 секунд = ровно 5 минут
         print("⏳ [ТАЙМЕР] Запускаем плановую проверку Alchemy...")
         try:
             # Берем базу данных точно так же, как делали в скрипте заливки товаров
@@ -352,12 +377,11 @@ async def sync_deactive_addresses_with_check(db: AsyncSession = Depends(get_db))
         )
         result = await db.execute(query)
         users_to_sync = result.scalars().all()
+        
         if not users_to_sync:
             return {"status": "empty", "message": "Нет новых юзеров для синхронизации"}
 
-        # 2. Собираем адреса, которые хотим добавить
-        addresses_to_add = [u.deposit_address for u in users_to_sync]
-        print(f"📦 Нашли {len(addresses_to_add)} адресов в БД. Проверяем Alchemy...")
+        print(f"📦 Нашли {len(users_to_sync)} адресов в БД со статусом deactive. Проверяем Alchemy...")
 
         # ==========================================
         # 🛡 ШАГ ЗАЩИТЫ: ПРОВЕРЯЕМ ALCHEMY
@@ -378,20 +402,36 @@ async def sync_deactive_addresses_with_check(db: AsyncSession = Depends(get_db))
                 return {"status": "error", "message": "Не удалось получить список адресов от Alchemy"}
                 
             alchemy_data = get_response.json()
-            # Переводим все адреса из Alchemy в нижний регистр для точного сравнения
-            existing_alchemy_addresses = [addr.lower() for addr in alchemy_data.get("addresses", [])]
+            
+            # 👇 ИСПРАВЛЕНО: Правильный ключ "data"
+            raw_existing = alchemy_data.get("data", alchemy_data.get("addresses", []))
+            existing_alchemy_addresses = [addr.lower() for addr in raw_existing]
+            
+            # Фильтруем: кого нужно отправить, а кому просто починить статус
+            final_addresses_to_push = []
             
             # Б. Сравниваем наши адреса со списком Alchemy
-            for addr in addresses_to_add:
+            for user in users_to_sync:
+                addr = user.deposit_address
                 if addr.lower() in existing_alchemy_addresses:
-                    print(f"⛔️ КРИТИЧЕСКАЯ ОШИБКА: Адрес {addr} УЖЕ ЕСТЬ в Alchemy!")
-                    # Как ты и просил — возвращаем ошибку и останавливаем процесс
-                    return {
-                        "status": "error", 
-                        "message": f"Конфликт! Адрес {addr} уже отслеживается в Alchemy."
-                    }
+                    # Если адрес УЖЕ в Alchemy, просто чиним статус в БД на active
+                    print(f"🔄 Адрес {addr} уже отслеживается в Alchemy. Меняем статус в БД на active.")
+                    user.address_status = "active"
+                else:
+                    # Если адреса нет в Alchemy, добавляем в очередь на отправку
+                    final_addresses_to_push.append(addr)
+            
+            # Сохраняем исправленные статусы для тех, кто уже был в Alchemy
+            await db.commit()
 
-            print("✅ Проверка пройдена: дубликатов в Alchemy не найдено.")
+            # Если отправлять больше некого (все уже были там), завершаем работу
+            if not final_addresses_to_push:
+                return {
+                    "status": "success", 
+                    "message": "Конфликты улажены: все deactive адреса уже были в Alchemy. Статусы в БД обновлены."
+                }
+
+            print(f"🚀 Проверка пройдена. Отправляем {len(final_addresses_to_push)} новых адресов...")
 
             # ==========================================
             # 🚀 ШАГ ОТПРАВКИ: ДОБАВЛЯЕМ В ALCHEMY
@@ -399,26 +439,29 @@ async def sync_deactive_addresses_with_check(db: AsyncSession = Depends(get_db))
             patch_url = "https://dashboard.alchemy.com/api/update-webhook-addresses"
             payload = {
                 "webhook_id": ALCHEMY_WEBHOOK_ID,
-                "addresses_to_add": addresses_to_add,
+                "addresses_to_add": final_addresses_to_push,
                 "addresses_to_remove": []
             }
             
             patch_response = await client.patch(patch_url, json=payload, headers=headers)
             
+            # В. ТОЛЬКО ЕСЛИ ALCHEMY ОТВЕТИЛ "ОК" -> МЕНЯЕМ СТАТУС НА ACTIVE
             if patch_response.status_code == 200:
-                # В. Если Alchemy ответил "ОК", меняем статус в базе на 'active'
                 for user in users_to_sync:
-                    user.address_status = "active"
+                    # Проверяем, что юзер был именно в списке на отправку
+                    if user.deposit_address in final_addresses_to_push:
+                        user.address_status = "active"
                 
-                await db.commit()
-                print(f"🎉 УСПЕХ! {len(addresses_to_add)} адресов добавлены в вебхук Alchemy.")
+                await db.commit() # Сохраняем в БД только после успеха
+                print(f"🎉 УСПЕХ! {len(final_addresses_to_push)} адресов добавлены в Alchemy и активированы в БД.")
                 
                 return {
                     "status": "success", 
-                    "synced_count": len(addresses_to_add),
-                    "addresses": addresses_to_add
+                    "synced_count": len(final_addresses_to_push),
+                    "addresses": final_addresses_to_push
                 }
             else:
+                # Если Alchemy выдал ошибку, база НЕ обновится, статус останется deactive
                 print(f"❌ Ошибка при добавлении в Alchemy: {patch_response.text}")
                 return {"status": "error", "message": "Сбой при записи адресов в Alchemy"}
 
