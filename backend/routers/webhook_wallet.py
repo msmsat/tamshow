@@ -48,7 +48,7 @@ async def alchemy_webhook(request: Request, db: AsyncSession = Depends(get_db)):
             # ==========================================
             # 1. ПРАВИЛО №1: НЕПРАВИЛЬНАЯ ВАЛЮТА СГОРАЕТ
             # ==========================================
-            if asset == "none":
+            if asset != "USDC":
                 print(f"🔥 ВАЛЮТА СГОРЕЛА: Юзер прислал {asset} вместо USDC.")
                 print(f"🔗 Транзакция: {tx_hash}")
                 print("Действие: Игнорируем перевод. Товар не выдается.")

@@ -2,20 +2,28 @@ import { create } from 'zustand';
 
 interface UserState {
   // Web3 состояние
+  tgId: string | null; // ID из Телеграма, который мы используем для всех запросов к бэкенду
   walletAddress: string | null;
   isVip: boolean;
+  isUser: boolean; // Новое поле для проверки наличия пользователя в базе данных
 
   // Действия
-  connectWallet: (tgId: string, address: string) => Promise<{success: boolean, error?: string}>;
-  disconnectWallet: (tgId: string) => Promise<boolean>;
-  checkVipOnBackend: (tgId: string) => Promise<void>;
+  setTgId: (id: string) => void; // <--- ДОБАВИТЬ ЭТО
+  connectWallet: (address: string) => Promise<{success: boolean, error?: string}>;
+  disconnectWallet: () => Promise<boolean>;
+  checkVipOnBackend: () => Promise<void>;
+  checkUserInDatabase: () => Promise<void>;
 }
 
-export const useUserStore = create<UserState>((set) => ({
+export const useUserStore = create<UserState>((set, get) => ({
+  tgId: null, // Заглушка для теста, потом заменим на реальный ID из Телеграма
   walletAddress: null,
   isVip: false,
+  isUser: false,
 
- connectWallet: async (tgId: string, address: string) => {
+
+  connectWallet: async (address: string) => {
+    const tgId = get().tgId;
     try {
       const response = await fetch('http://127.0.0.1:8000/api/wallet/connect', {
         method: 'POST',
@@ -39,7 +47,8 @@ export const useUserStore = create<UserState>((set) => ({
     }
   },
 
-  disconnectWallet: async (tgId: string) => {
+  disconnectWallet: async () => {
+    const tgId = get().tgId;
     try {
       const response = await fetch('http://127.0.0.1:8000/api/wallet/disconnect', {
         method: 'POST',
@@ -63,8 +72,9 @@ export const useUserStore = create<UserState>((set) => ({
     }
   },
 
-  checkVipOnBackend: async (tgId: string) => {
+  checkVipOnBackend: async () => {
     console.log("checkVipOnBackend")
+    const tgId = get().tgId;
     try {
       // Стучимся на бэкенд и передаем ему адрес кошелька
       // Заглушка для теста: жестко передаем id = "123456789". 
@@ -81,5 +91,27 @@ export const useUserStore = create<UserState>((set) => ({
       // Если Питон упал или хакер обрезал интернет - строго даем false
       set({ walletAddress: null }); 
     }
+  },
+
+  // Добавляем саму функцию:
+  setTgId: (id: string) => set({ tgId: id }),
+
+  checkUserInDatabase: async () => {
+    console.log("checkUserInDatabase")
+    const tgId = get().tgId;
+    if (!tgId) return; // Защита: если ID еще нет, ничего не делаем
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/user/status?tg_id=${tgId}`);
+      if (!response.ok) throw new Error("Ошибка бэкенда");
+      
+      // Питон ответил! Записываем то, что он сказал (true или false)
+      set({ isUser: true }); // Если пользователь найден в базе, ставим true
+      
+    } catch (error) {
+      console.error("Бэкенд недоступен, статус пользователя отклонен", error);
+      // Если Питон упал или хакер обрезал интернет - строго даем false
+      set({ isUser: false }); 
+    }
   }
+
 }))

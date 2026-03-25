@@ -146,7 +146,7 @@ async def process_alchemy_audit(db: AsyncSession):
 async def periodic_audit_task():
     while True:
         print("\n⏰ [ТАЙМЕР] Ждем 5 минут перед следующим аудитом...")
-        await asyncio.sleep(5) # 300 секунд = ровно 5 минут
+        await asyncio.sleep(300) # 300 секунд = ровно 5 минут
         print("⏳ [ТАЙМЕР] Запускаем плановую проверку Alchemy...")
         try:
             # Берем базу данных точно так же, как делали в скрипте заливки товаров

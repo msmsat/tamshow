@@ -50,7 +50,9 @@ app.add_middleware(
 app.include_router(wallet.router)
 app.include_router(ai_chat.router)
 app.include_router(cart_router)  # Подключаем роутер корзины
+print("✅ Роутеры подключены: wallet, ai_chat, cart")
 app.include_router(webhook_wallet.router) # <-- Подключили сокеты
+print("✅ Роутер для Alchemy Webhook подключен!")
 # ==========================================
 # 🛠 БАЗОВЫЕ ТЕСТОВЫЕ ЭНДПОИНТЫ
 # ==========================================

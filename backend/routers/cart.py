@@ -185,22 +185,47 @@ async def process_payment(req: CheckoutPayRequest, db: AsyncSession = Depends(ge
     if not user:
         return {"success": False, "error": "Пользователь не найден"}
 
-    # 2. Проверяем, хватает ли денег
-    if user.internal_balance < req.total_amount:
-        return {"success": False, "error": "Недостаточно средств на балансе"}
-
-    # 3. Списываем деньги
-    user.internal_balance -= req.total_amount
-
-    # 4. Очищаем корзину (удаляем все товары этого юзера из БД)
-    cart_query = select(CartItem).where(CartItem.telegram_id == req.tg_id)
-    cart_result = await db.execute(cart_query)
-    cart_items = cart_result.scalars().all()
+    # 2. ДОСТАЕМ КОРЗИНУ И СЧИТАЕМ СУММУ САМИ (Защита от хакеров)
+    cart_query = select(CartItem, Product).join(
+        Product, CartItem.product_id == Product.shopify_id
+    ).where(CartItem.telegram_id == req.tg_id)
     
-    for item in cart_items:
-        await db.delete(item)
+    cart_result = await db.execute(cart_query)
+    items_with_products = cart_result.all()
 
-    # 5. Сохраняем изменения
+    if not items_with_products:
+        return {"success": False, "error": "Корзина пуста!"}
+
+    # Считаем реальную сумму на основе базы данных
+    subtotal = 0.0
+    for cart_item, product in items_with_products:
+        subtotal += product.price * cart_item.quantity
+
+    # Применяем скидки и комиссии точно так же, как в превью
+    discount = round(subtotal * 0.2) if user.wallet_address else 0
+    network_fee = round(subtotal * 0.05)
+    total_calculated = subtotal - discount + network_fee
+
+    # 3. Проверяем, хватает ли денег
+    if user.internal_balance < total_calculated:
+        return {
+            "success": False, 
+            "error": f"Недостаточно средств. Нужно: ${total_calculated}, Баланс: ${user.internal_balance}"
+        }
+
+    # 4. Списываем ИСТИННУЮ сумму (игнорируем ту, что прислал React)
+    user.internal_balance -= total_calculated
+
+    # 5. Очищаем корзину 
+    # Так как мы уже достали cart_item в шаге 2, мы можем сразу их удалить
+    for cart_item, _ in items_with_products:
+        await db.delete(cart_item)
+
+    # 6. Сохраняем изменения
     await db.commit()
     
-    return {"success": True, "new_balance": user.internal_balance}
+    return {
+        "success": True, 
+        "new_balance": user.internal_balance, 
+        "paid_amount": total_calculated
+    }

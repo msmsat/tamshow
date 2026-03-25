@@ -1,4 +1,4 @@
-import { ShoppingBag, Minus, Trash2, Plus, Zap, ShieldCheck, ArrowRight, QrCode } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, Minus, Trash2, Plus, Zap, ShieldCheck, ArrowRight, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useUserStore } from '../store/useUserStore';
@@ -48,15 +48,21 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   // Empty State - Data Void
   if (cart.length === 0) {
     return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '70vh',
-        padding: '20px',
-        textAlign: 'center'
-      }}>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '70vh',
+          padding: '20px',
+          textAlign: 'center',
+          background: 'radial-gradient(circle at 50% 10%, rgba(168, 85, 247, 0.15) 0%, rgba(0, 0, 0, 0) 50%)' // Тот самый красивый градиент из Shop
+        }}
+      >
         {/* Hologram Effect */}
         <div style={{ position: 'relative', marginBottom: '32px' }}>
           {/* Glow Background */}
@@ -140,20 +146,26 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
         >
           Start Shopping
         </motion.button>
-      </div>
+      </motion.div>
     );
   }
 
   // Filled State - Active Loadout
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#0a0a0a',
-      paddingTop: '24px',
-      paddingLeft: '16px',
-      paddingRight: '16px',
-      paddingBottom: '180px'
-    }}>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      style={{
+        minHeight: '100vh',
+        backgroundColor: '#0a0a0a',
+        background: 'radial-gradient(circle at 50% 10%, rgba(168, 85, 247, 0.15) 0%, rgba(0, 0, 0, 0) 50%)', // Добавили градиент!
+        paddingTop: '24px',
+        paddingLeft: '16px',
+        paddingRight: '16px',
+        paddingBottom: '180px'
+      }}
+    >
       {/* Header with Inventory Title */}
       <div style={{
         display: 'flex',
@@ -161,6 +173,24 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
         gap: '12px',
         marginBottom: '32px'
       }}>
+        {/* Кнопка НАЗАД */}
+        <button 
+          onClick={() => onTabChange?.('shop')}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#9ca3af',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '8px',
+            marginLeft: '-8px' // Выравниваем по левому краю
+          }}
+        >
+          <ArrowLeft size={24} />
+        </button>
+
         <h1 style={{
           fontSize: '28px',
           fontWeight: 'bold',
@@ -193,168 +223,137 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
 
       {/* Zone A: Item Data Stream */}
       <div style={{ marginBottom: '20px' }}>
-        <AnimatePresence mode="popLayout">
+        {/* 1. УБРАЛИ mode="popLayout" - теперь карточка не будет "схлопываться" по ширине */}
+        <AnimatePresence>
           {cart.map(item => (
+            /* ВНЕШНИЙ СЛОЙ: Отвечает за плавное раскрытие и выезд СВЕРХУ (y: -40) */
             <motion.div
               key={item.id}
               layout
-              initial={{ opacity: 0, x: -50, height: 0 }}
-              animate={{ opacity: 1, x: 0, height: 'auto' }}
-              exit={{ opacity: 0, x: -50, height: 0 }}
-              transition={{ duration: 0.2 }}
-              style={{
-                backgroundColor: 'rgba(23, 23, 23, 0.6)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
-                borderRadius: '16px',
-                padding: '16px',
-                display: 'flex',
-                gap: '16px',
-                alignItems: 'center',
-                marginBottom: '12px'
+              initial={{ opacity: 0, height: 0, y: -40 }}
+              animate={{ opacity: 1, height: 'auto', y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -40 }}
+              transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1] }}
+              style={{ 
+                overflow: 'hidden',
+                // 🔥 ИСПРАВЛЕНИЕ 2: Заранее готовим браузер к анимации
+                willChange: 'opacity, transform, height' 
               }}
             >
-              {/* Product Image */}
-              <div style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '12px',
-                backgroundColor: 'rgba(168, 85, 247, 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                overflow: 'hidden',
-                border: '1px solid rgba(255, 255, 255, 0.1)'
-              }}>
-                {item.image.startsWith('/') || item.image.startsWith('http') ? (
-                  <img 
-                    src={item.image} 
-                    alt={item.title}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover'
-                    }}
-                  />
-                ) : (
-                  item.image
-                )}
-              </div>
-
-              {/* Info Block */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h3 style={{
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  color: '#ffffff',
-                  marginBottom: '4px',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}>
-                  {item.title}
-                </h3>
+              {/* СРЕДНИЙ СЛОЙ: Делает отступ между карточками. 
+                  Так как он внутри overflow: hidden, он будет плавно схлопываться вместе с карточкой! */}
+              <div style={{ paddingBottom: '12px' }}>
                 
-                <p style={{
-                  fontSize: '11px',
-                  color: '#9ca3af',
-                  marginBottom: '8px'
+                {/* ВНУТРЕННИЙ СЛОЙ: Сама карточка товара с красивым дизайном */}
+                <div style={{
+                  backgroundColor: 'rgba(23, 23, 23, 0.6)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: '16px',
+                  padding: '16px',
+                  display: 'flex',
+                  gap: '16px',
+                  alignItems: 'center',
                 }}>
-                  Type: {item.category}
-                </p>
-
-                {/* Price Display */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {walletAddress && (
-                    <span style={{
-                      fontSize: '11px',
-                      color: '#9ca3af',
-                      textDecoration: 'line-through'
-                    }}>
-                      ${item.price}
-                    </span>
-                  )}
-                  <span style={{
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    color: '#a855f7'
+                  
+                  {/* Product Image */}
+                  <div style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '12px',
+                    backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    overflow: 'hidden',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
                   }}>
-                    ${walletAddress ? Math.round(item.price * 0.8) : item.price}
-                  </span>
+                    {item.image.startsWith('/') || item.image.startsWith('http') ? (
+                      <img 
+                        src={item.image} 
+                        alt={item.title}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      item.image
+                    )}
+                  </div>
+
+                  {/* Info Block */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h3 style={{
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      color: '#ffffff',
+                      marginBottom: '4px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {item.title}
+                    </h3>
+                    
+                    <p style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '8px' }}>
+                      Type: {item.category}
+                    </p>
+
+                    {/* Price Display */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {walletAddress && (
+                        <span style={{ fontSize: '11px', color: '#9ca3af', textDecoration: 'line-through' }}>
+                          ${item.price}
+                        </span>
+                      )}
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#a855f7' }}>
+                        ${walletAddress ? Math.round(item.price * 0.8) : item.price}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Quantity Adjuster - Glass Capsule */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '12px',
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '24px',
+                    paddingLeft: '8px', paddingRight: '8px', paddingTop: '6px', paddingBottom: '6px',
+                    flexShrink: 0
+                  }}>
+                    <button
+                      onClick={() => handleQuantityChange(item.id, -1)}
+                      style={{
+                        background: 'none', border: 'none',
+                        color: item.quantity === 1 ? '#ef4444' : '#9ca3af',
+                        cursor: 'pointer', padding: '4px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = item.quantity === 1 ? '#ff6b6b' : '#d1d5db'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = item.quantity === 1 ? '#ef4444' : '#9ca3af'}
+                    >
+                      {item.quantity === 1 ? <Trash2 size={16} /> : <Minus size={16} />}
+                    </button>
+
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', minWidth: '16px', textAlign: 'center' }}>
+                      {item.quantity}
+                    </span>
+
+                    <button
+                      onClick={() => handleQuantityChange(item.id, 1)}
+                      style={{
+                        background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#d1d5db'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+
                 </div>
-              </div>
-
-              {/* Quantity Adjuster - Glass Capsule */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '24px',
-                paddingLeft: '8px',
-                paddingRight: '8px',
-                paddingTop: '6px',
-                paddingBottom: '6px',
-                flexShrink: 0
-              }}>
-                <button
-                  onClick={() => handleQuantityChange(item.id, -1)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: item.quantity === 1 ? '#ef4444' : '#9ca3af',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'color 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = item.quantity === 1 ? '#ff6b6b' : '#d1d5db';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = item.quantity === 1 ? '#ef4444' : '#9ca3af';
-                  }}
-                >
-                  {item.quantity === 1 ? <Trash2 size={16} /> : <Minus size={16} />}
-                </button>
-
-                <span style={{
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  color: '#ffffff',
-                  minWidth: '16px',
-                  textAlign: 'center'
-                }}>
-                  {item.quantity}
-                </span>
-
-                <button
-                  onClick={() => handleQuantityChange(item.id, 1)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#9ca3af',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'color 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = '#d1d5db';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = '#9ca3af';
-                  }}
-                >
-                  <Plus size={16} />
-                </button>
               </div>
             </motion.div>
           ))}
@@ -375,7 +374,7 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
             marginBottom: '20px',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px'
+            gap: '12px',
           }}
         >
           <ShieldCheck size={20} style={{ color: '#22c55e', flexShrink: 0 }} />
@@ -441,7 +440,7 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
           </div>
         </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -568,6 +567,7 @@ export function CheckoutFooter() {
   const discount = walletAddress ? Math.round(subtotal * 0.2) : 0;
   const networkFee = Math.round(subtotal * 0.05);
   const total = subtotal - discount + networkFee;
+  const isEnoughBalance = balance !== null && balance >= total;
 
   return (
     <>
@@ -702,16 +702,16 @@ export function CheckoutFooter() {
                     <span style={{ color: '#ffffff', fontWeight: 'bold', fontSize: '14px' }}>${balance?.toFixed(2)} USDC</span>
                   </div>
 
-                  {canPay ? (
+                  {isEnoughBalance ? (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(34, 197, 94, 0.1)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
                       <span style={{ color: '#86efac', fontSize: '12px' }}>After payment:</span>
-                      <span style={{ color: '#22c55e', fontWeight: 'bold', fontSize: '13px' }}>+${(balance! - (backendTotal !== null ? backendTotal : total)).toFixed(2)} USDC</span>
+                      <span style={{ color: '#22c55e', fontWeight: 'bold', fontSize: '13px' }}>+${(balance! - total).toFixed(2)} USDC</span>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ color: '#fca5a5', fontSize: '12px' }}>Missing funds:</span>
-                        <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '13px' }}>-${((backendTotal !== null ? backendTotal : total) - balance!).toFixed(2)} USDC</span>
+                        <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '13px' }}>-${(total - balance!).toFixed(2)} USDC</span>
                       </div>
                       <button 
                         onClick={() => setShowPayQR(true)} 
@@ -746,28 +746,26 @@ export function CheckoutFooter() {
         </div>
 
         <motion.button
-          whileTap={{ scale: (!isExpanded || canPay || isSuccess) ? 0.95 : 1 }}
+          whileTap={{ scale: (!isExpanded || isEnoughBalance || isSuccess) ? 0.95 : 1 }}
           onClick={() => {
              if (isSuccess) {
-                 // Если уже оплачено - закрываем чек и сбрасываем статус
                  setIsExpanded(false);
                  setTimeout(() => setIsSuccess(false), 500); 
              } else if (!isExpanded) {
-                 setIsExpanded(true); // Открываем чек
-             } else if (canPay && !isPaying) {
-                 // НАЖИМАЕМ ОПЛАТИТЬ!
+                 setIsExpanded(true);
+             } else if (isEnoughBalance && !isPaying) {
                  handlePayment(); 
              }
           }}
-          disabled={isExpanded && !canPay && !isSuccess}
+          disabled={isExpanded && !isEnoughBalance && !isSuccess}
           style={{
              flex: 1, height: '48px', 
-             background: (isExpanded && !canPay && !isSuccess) ? '#374151' : 'linear-gradient(to right, rgba(168, 85, 247, 0.9), rgba(59, 130, 246, 0.9))',
+             background: (isExpanded && !isEnoughBalance && !isSuccess) ? '#374151' : 'linear-gradient(to right, rgba(168, 85, 247, 0.9), rgba(59, 130, 246, 0.9))',
              border: 'none', borderRadius: '12px', 
-             color: (isExpanded && !canPay && !isSuccess) ? '#9ca3af' : '#ffffff', 
+             color: (isExpanded && !isEnoughBalance && !isSuccess) ? '#9ca3af' : '#ffffff', 
              fontSize: '13px', fontWeight: 700, 
-             cursor: (isExpanded && !canPay && !isSuccess) ? 'not-allowed' : 'pointer',
-             boxShadow: (isExpanded && !canPay && !isSuccess) ? 'none' : '0 0 20px rgba(168, 85, 247, 0.4)', 
+             cursor: (isExpanded && !isEnoughBalance && !isSuccess) ? 'not-allowed' : 'pointer',
+             boxShadow: (isExpanded && !isEnoughBalance && !isSuccess) ? 'none' : '0 0 20px rgba(168, 85, 247, 0.4)', 
              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
              transition: 'all 0.3s'
           }}
@@ -775,10 +773,10 @@ export function CheckoutFooter() {
           <span>
             {isPaying ? 'Processing...' : 
               isSuccess ? 'Close Receipt' : 
-                (isExpanded ? (canPay ? 'Confirm & Pay' : 'Insufficient Balance') : 'Checkout')
+                (isExpanded ? (isEnoughBalance ? 'Confirm & Pay' : 'Insufficient Balance') : 'Checkout')
             }
           </span>
-          {!isPaying && !isSuccess && canPay && <ArrowRight size={14} />}
+          {!isPaying && !isSuccess && isEnoughBalance && <ArrowRight size={14} />}
         </motion.button>
       </motion.div>
     </motion.div>

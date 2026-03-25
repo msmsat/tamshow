@@ -15,9 +15,7 @@ interface WalletConnectProps {
 }
 
 export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 247, 0.3)', mouseEnterColor = 'rgba(168, 85, 247, 0.5)', mouseLeaveColor = 'rgba(168, 85, 247, 0.3)', mouseEnterBorderColor = 'rgba(168, 85, 247, 0.5)', mouseLeaveBorderColor = 'rgba(168, 85, 247, 0.3)' }: WalletConnectProps) {
-  const { walletAddress, connectWallet, disconnectWallet, checkVipOnBackend } = useUserStore();
-  const tgId = "620994031"; // Заглушка для теста, потом заменим на реальный ID из Телеграма
-
+  const { walletAddress, tgId, connectWallet, disconnectWallet, checkVipOnBackend } = useUserStore();
   // 1. Достаем функции из Web3Modal
   // СОЗДАЕМ ХРАНИЛИЩЕ ДЛЯ ТЕКСТА ОШИБКИ
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -29,7 +27,7 @@ export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 
   // 2. ВОТ ЗДЕСЬ МЫ ВЫЗЫВАЕМ ПРОВЕРКУ!
   // Этот код сработает ровно один раз, когда кнопка появится на экране
   useEffect(() => {
-    checkVipOnBackend(tgId); // Передаем ID в функцию проверки
+    checkVipOnBackend(); // Передаем ID в функцию проверки
   }, [checkVipOnBackend]);
 
   // 2. Ваша функция теперь просто вызывает красивое окно!
@@ -46,7 +44,7 @@ export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 
         console.log("🦊 Web3Modal дал адрес. Спрашиваем Питона...");
         setErrorMsg(null);
         
-        const result = await connectWallet(tgId, address);
+        const result = await connectWallet(address);
         
         if (!result.success) {
           console.log("❌ Питон отказал! Стираем память Web3Modal.");
@@ -77,7 +75,7 @@ export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 
     try {
       await disconnect(); 
       if (tgId) {
-        await disconnectWallet(tgId);
+        await disconnectWallet();
         setErrorMsg(null); // Сбрасываем ошибку при выходе
         console.log("🔌 Кошелек элегантно отвязан!");
       }

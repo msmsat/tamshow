@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  User, Wallet, Copy, Check, Package, Zap, MapPin, Settings, 
-  LogOut, Image as ImageIcon, Hexagon, ChevronRight
+  Wallet, Copy, Check, Package, Zap, MapPin, Settings, 
+  LogOut, Image as ImageIcon, Hexagon, ChevronRight, AlertTriangle 
 } from 'lucide-react';
 import { useUserStore } from '../store/useUserStore';
+import { useDisconnect, useWeb3Modal, useWeb3ModalAccount } from '@web3modal/ethers/react';
 
 // Mock data для демонстрации
 const mockOrders = [
@@ -12,41 +13,57 @@ const mockOrders = [
   { id: 2, name: 'VIP Pass', date: '2024-02-28', status: 'Delivered', tracking: 'TRACK124' },
 ];
 
+
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.15,
-    },
+    transition: { staggerChildren: 0.1, delayChildren: 0.15 },
   },
 };
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.4 },
-  },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
 export function Profile() {
-  const { isVip } = useUserStore();
-  const [walletConnected, setWalletConnected] = useState(false);
+  const { tgId, walletAddress, disconnectWallet, connectWallet } = useUserStore();
+  const { disconnect } = useDisconnect();
+  const { open } = useWeb3Modal();
+  const { address, isConnected } = useWeb3ModalAccount();
   const [copiedAddress, setCopiedAddress] = useState(false);
+
+  
+  // Добавь вот эту строчку, чтобы увидеть ТИП переменной:
+  console.log("🔥 РЕНДЕР ПРОФИЛЯ | Значение:", walletAddress, "| Тип:", typeof walletAddress);
+
+  useEffect(() => {
+    // Если Web3Modal говорит, что кошелек подключен, и мы знаем его адрес,
+    // НО в нашем глобальном сторе (и в Питоне) его еще нет:
+    if (isConnected && address && walletAddress !== address) {
+      console.log("🌐 Кошелек обнаружен! Отправляем в Питон:", address);
+      connectWallet(address); // Сохраняем в Zustand и отправляем в БД
+    }
+  }, [isConnected, address, walletAddress, connectWallet]);
 
   // Mock wallet address
   const mockWalletAddress = '0x1234567890abcdef1234567890abcdef12345678';
   const shortAddress = `${mockWalletAddress.slice(0, 6)}...${mockWalletAddress.slice(-4)}`;
 
-  const handleConnectWallet = () => {
-    setWalletConnected(true);
-  };
+  const handleDisconnect = async () => {
+    // Шаг А: СНАЧАЛА отключаем кошелек в браузере (Web3Modal). 
+    // Это вырубит нашего "шпиона" (isConnected станет false)
+    disconnect(); 
 
-  const handleDisconnect = () => {
-    setWalletConnected(false);
+    // Шаг Б: Теперь спокойно удаляем кошелек из Питона и Zustand
+    const isSuccess = await disconnectWallet();
+
+    if (isSuccess) {
+      console.log("Кошелек успешно отвязан локально и удален из БД!");
+    } else {
+      console.error("Ошибка связи с сервером при удалении.");
+    }
   };
 
   const handleCopyAddress = () => {
@@ -61,6 +78,54 @@ export function Profile() {
     const hue = (hash % 360);
     return `hsl(${hue}, 100%, 45%)`;
   };
+
+  // === НОВЫЙ БЛОК: ЗАЩИТА ОТ ПОТЕРИ СВЯЗИ С TELEGRAM ===
+  if (!tgId) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        style={{
+          minHeight: '100vh',
+          backgroundColor: '#0a0a0a',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+          textAlign: 'center',
+          paddingBottom: '112px'
+        }}
+      >
+        <div style={{
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          borderRadius: '24px',
+          padding: '32px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          maxWidth: '320px',
+          boxShadow: '0 0 30px rgba(239, 68, 68, 0.1)'
+        }}>
+          <motion.div
+            animate={{ opacity: [1, 0.5, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            <AlertTriangle size={48} style={{ color: '#ef4444', marginBottom: '16px' }} />
+          </motion.div>
+          <h2 style={{ color: '#ffffff', fontSize: '20px', fontWeight: 'bold', marginBottom: '12px' }}>
+            Identity Not Found
+          </h2>
+          <p style={{ color: '#9ca3af', fontSize: '14px', lineHeight: '1.6' }}>
+            Сбой связи с протоколом Telegram. Мы не смогли получить ваш ID. 
+            Пожалуйста, закройте это окно и запустите Web App заново.
+          </p>
+        </div>
+      </motion.div>
+    );
+  }
+  // === КОНЕЦ НОВОГО БЛОКА ===
 
   return (
     <motion.div
@@ -80,51 +145,34 @@ export function Profile() {
       <motion.div variants={itemVariants} style={{ marginBottom: '32px' }}>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           {/* Avatar */}
-          {walletConnected ? (
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-              style={{
-                position: 'relative',
-                width: '80px',
-                height: '80px',
-                borderRadius: '16px',
-                overflow: 'hidden',
-                border: '2px solid #06b6d4',
-                boxShadow: '0 0 20px rgba(6, 182, 212, 0.3)'
-              }}
-            >
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  background: `linear-gradient(135deg, ${generateAvatarGradient(mockWalletAddress)}, #a855f7)`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#ffffff' }}>
-                  {mockWalletAddress[2].toUpperCase()}
-                </span>
-              </div>
-            </motion.div>
-          ) : (
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+            style={{
+              position: 'relative',
+              width: '80px',
+              height: '80px',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              border: '2px solid #06b6d4',
+              boxShadow: '0 0 20px rgba(6, 182, 212, 0.3)'
+            }}
+          >
             <div
               style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '16px',
-                backgroundColor: '#404040',
+                width: '100%',
+                height: '100%',
+                background: `linear-gradient(135deg, ${generateAvatarGradient(mockWalletAddress)}, #a855f7)`,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                border: '2px solid rgba(255, 255, 255, 0.1)'
+                justifyContent: 'center'
               }}
             >
-              <User size={40} style={{ color: '#9ca3af' }} />
+              <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#ffffff' }}>
+                {mockWalletAddress[2].toUpperCase()}
+              </span>
             </div>
-          )}
+          </motion.div>
 
           {/* User Info */}
           <div>
@@ -137,7 +185,7 @@ export function Profile() {
                 marginBottom: '8px'
               }}
             >
-              {walletConnected ? shortAddress : 'Guest Protocol'}
+              {tgId}
             </h2>
 
             {/* VIP Badge */}
@@ -148,27 +196,27 @@ export function Profile() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                backgroundColor: walletConnected && isVip ? 'rgba(168, 85, 247, 0.15)' : 'rgba(64, 64, 64, 0.4)',
-                border: walletConnected && isVip ? '1px solid rgba(168, 85, 247, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                backgroundColor: walletAddress ? 'rgba(168, 85, 247, 0.15)' : 'rgba(64, 64, 64, 0.4)',
+                border: walletAddress ? '1px solid rgba(168, 85, 247, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: '20px',
                 paddingLeft: '10px',
                 paddingRight: '10px',
                 paddingTop: '6px',
                 paddingBottom: '6px',
                 width: 'fit-content',
-                boxShadow: walletConnected && isVip ? '0 0 15px rgba(168, 85, 247, 0.2)' : 'none'
+                boxShadow: walletAddress ? '0 0 15px rgba(168, 85, 247, 0.2)' : 'none'
               }}
             >
-              {walletConnected && isVip && <Hexagon size={14} style={{ color: '#c084fc' }} />}
+              {walletAddress && <Hexagon size={14} style={{ color: '#c084fc' }} />}
               <span
                 style={{
                   fontSize: '11px',
                   fontWeight: 700,
-                  color: walletConnected && isVip ? '#c084fc' : '#9ca3af',
+                  color: walletAddress ? '#c084fc' : '#9ca3af',
                   letterSpacing: '0.5px'
                 }}
               >
-                {walletConnected && isVip ? 'Level 4: Nexus VIP' : 'Level 1: Nomad'}
+                {walletAddress ? 'Level 4: Nexus VIP' : 'Level 1: Nomad'}
               </span>
             </motion.div>
           </div>
@@ -176,87 +224,7 @@ export function Profile() {
       </motion.div>
 
       {/* ⚡ Smart Contract Hub */}
-      {!walletConnected ? (
-        <motion.div
-          variants={itemVariants}
-          style={{
-            backgroundColor: 'rgba(23, 23, 23, 0.6)',
-            backdropFilter: 'blur(32px)',
-            WebkitBackdropFilter: 'blur(32px)',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
-            borderRadius: '24px',
-            padding: '32px',
-            textAlign: 'center',
-            marginBottom: '32px'
-          }}
-        >
-          <motion.div
-            animate={{ y: [0, -8, 0] }}
-            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-            style={{ marginBottom: '16px' }}
-          >
-            <Wallet
-              size={48}
-              style={{
-                color: 'rgba(6, 182, 212, 0.6)',
-                margin: '0 auto',
-                display: 'block',
-                filter: 'drop-shadow(0 0 12px rgba(6, 182, 212, 0.3))'
-              }}
-            />
-          </motion.div>
-
-          <h3
-            style={{
-              fontSize: '20px',
-              fontWeight: 'bold',
-              color: '#ffffff',
-              marginBottom: '8px'
-            }}
-          >
-            Connect your Web3 Identity
-          </h3>
-
-          <p
-            style={{
-              fontSize: '13px',
-              color: '#9ca3af',
-              marginBottom: '24px',
-              lineHeight: '1.6'
-            }}
-          >
-            Hold Nexus NFT to unlock 20% discount, premium AI access, and exclusive drops.
-          </p>
-
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            whileHover={{ scale: 1.02 }}
-            onClick={handleConnectWallet}
-            style={{
-              width: '100%',
-              padding: '14px',
-              backgroundColor: 'rgba(6, 182, 212, 0.9)',
-              border: 'none',
-              borderRadius: '12px',
-              color: '#ffffff',
-              fontSize: '14px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 0 20px rgba(6, 182, 212, 0.4)',
-              transition: 'all 0.3s ease',
-              letterSpacing: '0.5px'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 0 30px rgba(6, 182, 212, 0.6)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 0 20px rgba(6, 182, 212, 0.4)';
-            }}
-          >
-            Connect Wallet
-          </motion.button>
-        </motion.div>
-      ) : (
+      {walletAddress && (
         <motion.div
           variants={itemVariants}
           style={{
@@ -286,7 +254,7 @@ export function Profile() {
             <div>
               <p style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>Wallet Address</p>
               <p style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff', fontFamily: 'monospace' }}>
-                {mockWalletAddress}
+                {walletAddress}
               </p>
             </div>
             <motion.button
@@ -342,139 +310,197 @@ export function Profile() {
       )}
 
       {/* 📋 Command Menu */}
-      {walletConnected && (
-        <motion.div variants={itemVariants} style={{ marginBottom: '32px' }}>
-          {/* Order History */}
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            whileHover={{ backgroundColor: 'rgba(23, 23, 23, 0.8)' }}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '16px',
-              backgroundColor: 'rgba(23, 23, 23, 0.4)',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
-              borderRadius: '16px',
-              marginBottom: '12px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Package size={20} style={{ color: '#a855f7' }} />
-              <span style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>
-                Logistics & Orders
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {mockOrders.length > 0 && (
-                <motion.div
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    backgroundColor: '#06b6d4',
-                    borderRadius: '50%'
-                  }}
-                />
-              )}
-              <ChevronRight size={16} style={{ color: '#9ca3af' }} />
-            </div>
-          </motion.button>
-
-          {/* Active Subscriptions */}
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            whileHover={{ backgroundColor: 'rgba(23, 23, 23, 0.8)' }}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '16px',
-              backgroundColor: 'rgba(23, 23, 23, 0.4)',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
-              borderRadius: '16px',
-              marginBottom: '12px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Zap size={20} style={{ color: '#06b6d4' }} />
-              <span style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>
-                Active Subscriptions
-              </span>
-            </div>
-            <ChevronRight size={16} style={{ color: '#9ca3af' }} />
-          </motion.button>
-
-          {/* Delivery Coordinates */}
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            whileHover={{ backgroundColor: 'rgba(23, 23, 23, 0.8)' }}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '16px',
-              backgroundColor: 'rgba(23, 23, 23, 0.4)',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
-              borderRadius: '16px',
-              marginBottom: '12px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <MapPin size={20} style={{ color: '#d1d5db' }} />
-              <span style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>
-                Delivery Coordinates
-              </span>
-            </div>
-            <ChevronRight size={16} style={{ color: '#9ca3af' }} />
-          </motion.button>
-
-          {/* App Settings */}
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            whileHover={{ backgroundColor: 'rgba(23, 23, 23, 0.8)' }}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '16px',
-              backgroundColor: 'rgba(23, 23, 23, 0.4)',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
-              borderRadius: '16px',
-              marginBottom: '12px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <motion.div variants={itemVariants} style={{ marginBottom: '32px' }}>
+        {/* Order History */}
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          whileHover={{ backgroundColor: 'rgba(23, 23, 23, 0.8)' }}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px',
+            backgroundColor: 'rgba(23, 23, 23, 0.4)',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+            borderRadius: '16px',
+            marginBottom: '12px',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Package size={20} style={{ color: '#a855f7' }} />
+            <span style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>
+              Logistics & Orders
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {mockOrders.length > 0 && (
               <motion.div
-                whileHover={{ rotate: 90 }}
-                transition={{ duration: 0.5 }}
-              >
-                <Settings size={20} style={{ color: '#9ca3af' }} />
-              </motion.div>
-              <span style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>
-                App Settings
-              </span>
-            </div>
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  backgroundColor: '#06b6d4',
+                  borderRadius: '50%'
+                }}
+              />
+            )}
             <ChevronRight size={16} style={{ color: '#9ca3af' }} />
+          </div>
+        </motion.button>
+
+        {/* Active Subscriptions */}
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          whileHover={{ backgroundColor: 'rgba(23, 23, 23, 0.8)' }}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px',
+            backgroundColor: 'rgba(23, 23, 23, 0.4)',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+            borderRadius: '16px',
+            marginBottom: '12px',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Zap size={20} style={{ color: '#06b6d4' }} />
+            <span style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>
+              Active Subscriptions
+            </span>
+          </div>
+          <ChevronRight size={16} style={{ color: '#9ca3af' }} />
+        </motion.button>
+
+        {/* Delivery Coordinates */}
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          whileHover={{ backgroundColor: 'rgba(23, 23, 23, 0.8)' }}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px',
+            backgroundColor: 'rgba(23, 23, 23, 0.4)',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+            borderRadius: '16px',
+            marginBottom: '12px',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <MapPin size={20} style={{ color: '#d1d5db' }} />
+            <span style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>
+              Delivery Coordinates
+            </span>
+          </div>
+          <ChevronRight size={16} style={{ color: '#9ca3af' }} />
+        </motion.button>
+
+        {/* App Settings */}
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          whileHover={{ backgroundColor: 'rgba(23, 23, 23, 0.8)' }}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px',
+            backgroundColor: 'rgba(23, 23, 23, 0.4)',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+            borderRadius: '16px',
+            marginBottom: '12px',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <motion.div
+              whileHover={{ rotate: 90 }}
+              transition={{ duration: 0.5 }}
+            >
+              <Settings size={20} style={{ color: '#9ca3af' }} />
+            </motion.div>
+            <span style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>
+              App Settings
+            </span>
+          </div>
+          <ChevronRight size={16} style={{ color: '#9ca3af' }} />
+        </motion.button>
+      </motion.div>
+
+      
+      {/* 🚀 Link Web3 Identity Zone */}
+      {!walletAddress && (
+        <motion.div
+          variants={itemVariants}
+          style={{
+            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+            paddingTop: '24px',
+            marginTop: '24px'
+          }}
+        >
+          {/* Главная кнопка-контейнер */}
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => open()} // 🔥 ВОТ ОНА, МАГИЯ МГНОВЕННОГО КЛИКА!
+            style={{
+              width: '100%',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'row', 
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px', 
+              padding: '14px 16px', 
+              backgroundColor: 'rgba(6, 182, 212, 0.05)',
+              border: '1px solid rgba(6, 182, 212, 0.3)',
+              borderRadius: '12px', 
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              textAlign: 'center'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(6, 182, 212, 0.1)';
+              e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.6)';
+              e.currentTarget.style.boxShadow = '0 0 15px rgba(6, 182, 212, 0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(6, 182, 212, 0.05)';
+              e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.3)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            {/* Иконка */}
+            <Wallet size={16} style={{ color: '#06b6d4' }} />
+            
+            {/* Текст */}
+            <span style={{ 
+              fontSize: '14px', 
+              fontWeight: 700, 
+              color: '#ffffff', 
+              letterSpacing: '0.5px' 
+            }}>
+              Link Web3 Wallet
+            </span>
+
+            {/* Мы ПОЛНОСТЬЮ УДАЛИЛИ прозрачный <WalletConnect /> отсюда! */}
           </motion.button>
         </motion.div>
       )}
-
+      
       {/* 🚨 Danger Zone */}
-      {walletConnected && (
+      {walletAddress && (
         <motion.div
           variants={itemVariants}
           style={{

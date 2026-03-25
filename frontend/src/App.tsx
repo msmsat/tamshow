@@ -1,5 +1,3 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
 // Берем нужные иконки из Lucide (как в ТЗ)
 import { Home as HomeIcon, ShoppingBag, MessageSquare, ShoppingCart, User } from 'lucide-react';
 import { Home } from './pages/Home';
@@ -10,8 +8,17 @@ import { Cart, CheckoutFooter } from './pages/Cart';
 import { Profile } from './pages/Profile';
 import { useUIStore } from './store/useUIStore';
 import { useCartStore } from './store/useCartStore';
+import { useUserStore } from './store/useUserStore';
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 // web3
 import { createWeb3Modal, defaultConfig } from '@web3modal/ethers/react';
+
+declare global {
+  interface Window {
+    Telegram?: any;
+  }
+}
 
 // 1. Настройка сети (пока берем обычный Ethereum)
 const mainnet = {
@@ -51,6 +58,28 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const { selectedProductId, selectProduct } = useUIStore();
   const { cart } = useCartStore();
+  const { setTgId, checkUserInDatabase } = useUserStore();
+
+  // 3. МАГИЯ ИНИЦИАЛИЗАЦИИ
+  useEffect(() => {
+    // Пытаемся достать данные из Telegram Mini App
+    const telegramUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+    
+    // Запасной ID, если открыли просто в браузере (для твоих тестов)
+    let realId = "620994031"; 
+
+    // Если мы реально внутри Телеграма - берем настоящий ID!
+    if (telegramUser && telegramUser.id) {
+      realId = telegramUser.id.toString();
+    }
+
+    // Шаг А: Сначала сохраняем правильный ID в глобальное хранилище
+    setTgId(realId);
+
+    // Шаг Б: Теперь запускаем проверку (хранилище уже знает правильный ID)
+    checkUserInDatabase();
+    
+  }, [setTgId, checkUserInDatabase]); // Сработает ровно один раз при запуске
 
   return (
     // Главный экран: жестко фиксируем 100vh, чтобы не было системного скролла!
