@@ -63,6 +63,7 @@ class Order(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     total_amount: Mapped[float] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String, default="PENDING") # PENDING, PAID, CANCELLED
+    tracking_number: Mapped[Optional[str]] = mapped_column(String)
     payment_ref: Mapped[Optional[str]] = mapped_column(String, unique=True)
     blockchain_tx_hash: Mapped[Optional[str]] = mapped_column(String)
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

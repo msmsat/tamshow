@@ -5,7 +5,7 @@ from sqlalchemy.future import select
 
 # Импортируем вашу функцию для БД и новую модель
 from database import get_db
-from models import CartItem, User, Product
+from models import CartItem, User, Product, Order, OrderItem
 
 # Создаем роутер с префиксом, чтобы не писать /api/cart каждый раз
 router = APIRouter(
@@ -213,19 +213,56 @@ async def process_payment(req: CheckoutPayRequest, db: AsyncSession = Depends(ge
             "error": f"Недостаточно средств. Нужно: ${total_calculated}, Баланс: ${user.internal_balance}"
         }
 
-    # 4. Списываем ИСТИННУЮ сумму (игнорируем ту, что прислал React)
-    user.internal_balance -= total_calculated
+    try:
+        # 1. Списываем деньги с баланса юзера
+        user.internal_balance -= total_calculated
 
-    # 5. Очищаем корзину 
-    # Так как мы уже достали cart_item в шаге 2, мы можем сразу их удалить
-    for cart_item, _ in items_with_products:
-        await db.delete(cart_item)
+        # 2. Создаем главный чек (Order)
+        new_order = Order(
+            user_id=user.id,
+            total_amount=total_calculated,
+            status="PAID" # Заказ сразу оплачен
+        )
+        db.add(new_order)
+        await db.flush() # 🔥 ДОБАВЛЕН await! Получаем ID заказа
 
-    # 6. Сохраняем изменения
-    await db.commit()
-    
-    return {
-        "success": True, 
-        "new_balance": user.internal_balance, 
-        "paid_amount": total_calculated
-    }
+        # 3. Переносим товары из корзины в чек
+        # У нас УЖЕ ЕСТЬ переменная items_with_products из начала функции,
+        # поэтому нам не нужно делать новые запросы к БД!
+        for cart_item, product in items_with_products:
+            
+            # По умолчанию товар считается физическим и едет к юзеру
+            item_status = "PAID_NOT_DELIVERED"
+            
+            # Если это подписка - сразу выдаем
+            if hasattr(product, 'category') and product.category == 'subscription':
+                item_status = "DELIVERED"
+
+            # Создаем позицию в чеке
+            new_order_item = OrderItem(
+                order_id=new_order.id,
+                product_id=product.id,
+                quantity=cart_item.quantity,
+                price=product.price,
+                status=item_status
+            )
+            db.add(new_order_item)
+
+            # 4. Сразу удаляем этот товар из корзины
+            await db.delete(cart_item) # 🔥 Асинхронное удаление
+
+        # 5. Фиксируем все изменения в базе данных разом!
+        await db.commit() # 🔥 ДОБАВЛЕН await!
+
+        return {
+            "success": True,
+            "message": "Payment successful, order created!"
+        }
+
+    except Exception as e:
+        await db.rollback() # 🔥 ДОБАВЛЕН await! Если ошибка - отменяем списание
+        print(f"Ошибка при сохранении заказа: {e}")
+        return {
+            "success": False,
+            "error": "Database error during checkout"
+        }

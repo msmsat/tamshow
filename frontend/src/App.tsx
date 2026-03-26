@@ -131,7 +131,7 @@ export default function App() {
           {activeTab === 'shop' && <Shop />}
           {activeTab === 'chat' && <AiChat />}
           {activeTab === 'cart' && <Cart onTabChange={setActiveTab} />}
-          {activeTab === 'profile' && <Profile />}
+          {activeTab === 'profile' && <Profile onTabChange={setActiveTab} />}
         </>
       </div>
 

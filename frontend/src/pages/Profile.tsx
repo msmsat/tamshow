@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useUserStore } from '../store/useUserStore';
 import { useDisconnect, useWeb3Modal, useWeb3ModalAccount } from '@web3modal/ethers/react';
+import { OrdersModal } from '../components/OrdersModal';
 
 // Mock data для демонстрации
 const mockOrders = [
@@ -27,12 +28,12 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
-export function Profile() {
-  const { tgId, walletAddress, disconnectWallet, connectWallet } = useUserStore();
+export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }) {const { tgId, walletAddress, disconnectWallet, connectWallet } = useUserStore();
   const { disconnect } = useDisconnect();
   const { open } = useWeb3Modal();
   const { address, isConnected } = useWeb3ModalAccount();
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [isOrdersOpen, setIsOrdersOpen] = useState(false);
 
   
   // Добавь вот эту строчку, чтобы увидеть ТИП переменной:
@@ -48,8 +49,9 @@ export function Profile() {
   }, [isConnected, address, walletAddress, connectWallet]);
 
   // Mock wallet address
-  const mockWalletAddress = '0x1234567890abcdef1234567890abcdef12345678';
-  const shortAddress = `${mockWalletAddress.slice(0, 6)}...${mockWalletAddress.slice(-4)}`;
+  const shortAddress = walletAddress 
+    ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` 
+    : '';
 
   const handleDisconnect = async () => {
     // Шаг А: СНАЧАЛА отключаем кошелек в браузере (Web3Modal). 
@@ -67,7 +69,8 @@ export function Profile() {
   };
 
   const handleCopyAddress = () => {
-    navigator.clipboard.writeText(mockWalletAddress);
+    if (!walletAddress) return; // Защита
+    navigator.clipboard.writeText(walletAddress);
     setCopiedAddress(true);
     setTimeout(() => setCopiedAddress(false), 2000);
   };
@@ -162,14 +165,14 @@ export function Profile() {
               style={{
                 width: '100%',
                 height: '100%',
-                background: `linear-gradient(135deg, ${generateAvatarGradient(mockWalletAddress)}, #a855f7)`,
+                background: `linear-gradient(135deg, ${generateAvatarGradient(walletAddress ? walletAddress : '')}, #a855f7)`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
             >
               <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#ffffff' }}>
-                {mockWalletAddress[2].toUpperCase()}
+                {walletAddress ? walletAddress[2].toUpperCase() : ''}
               </span>
             </div>
           </motion.div>
@@ -254,7 +257,7 @@ export function Profile() {
             <div>
               <p style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>Wallet Address</p>
               <p style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff', fontFamily: 'monospace' }}>
-                {walletAddress}
+                {shortAddress}
               </p>
             </div>
             <motion.button
@@ -315,6 +318,7 @@ export function Profile() {
         <motion.button
           whileTap={{ scale: 0.98 }}
           whileHover={{ backgroundColor: 'rgba(23, 23, 23, 0.8)' }}
+          onClick={() => setIsOrdersOpen(true)} // 🔥 ДОБАВИТЬ ЭТО
           style={{
             width: '100%',
             display: 'flex',
@@ -332,7 +336,7 @@ export function Profile() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <Package size={20} style={{ color: '#a855f7' }} />
             <span style={{ fontSize: '14px', fontWeight: 600, color: '#ffffff' }}>
-              Logistics & Orders
+              Orders
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -543,6 +547,16 @@ export function Profile() {
           </motion.button>
         </motion.div>
       )}
+      {/* 🔥 НАША НОВАЯ МОДАЛКА В САМОМ НИЗУ */}
+      <OrdersModal 
+        isOpen={isOrdersOpen} 
+        onClose={() => setIsOrdersOpen(false)} 
+        orders={mockOrders} // Передаем фейковые заказы сверху файла (можешь очистить массив, чтобы проверить пустой дизайн)
+        onGoToCart={() => {
+          setIsOrdersOpen(false); // Закрываем модалку
+          onTabChange?.('cart');  // Перекидываем юзера в корзину
+        }} 
+      />
     </motion.div>
   );
 }

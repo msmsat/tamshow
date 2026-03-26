@@ -12,7 +12,7 @@ from database import engine, get_db
 from models import Base
 
 # 1. ИМПОРТИРУЕМ НАШИ РОУТЕРЫ ИЗ ПАПКИ
-from routers import wallet, ai_chat
+from routers import wallet, ai_chat, profile
 from routers.cart import router as cart_router
 
 @asynccontextmanager
@@ -53,6 +53,7 @@ app.include_router(cart_router)  # Подключаем роутер корзи�
 print("✅ Роутеры подключены: wallet, ai_chat, cart")
 app.include_router(webhook_wallet.router) # <-- Подключили сокеты
 print("✅ Роутер для Alchemy Webhook подключен!")
+app.include_router(profile.router) # Подключаем новый роутер
 # ==========================================
 # 🛠 БАЗОВЫЕ ТЕСТОВЫЕ ЭНДПОИНТЫ
 # ==========================================
