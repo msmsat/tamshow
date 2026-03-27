@@ -230,27 +230,27 @@ async def process_payment(req: CheckoutPayRequest, db: AsyncSession = Depends(ge
         # 3. Переносим товары из корзины в чек
         # У нас УЖЕ ЕСТЬ переменная items_with_products из начала функции,
         # поэтому нам не нужно делать новые запросы к БД!
+        # 3. Переносим товары из корзины в чек (ПОШТУЧНО)
         for cart_item, product in items_with_products:
             
-            # По умолчанию товар считается физическим и едет к юзеру
             item_status = "PAID_NOT_DELIVERED"
-            
-            # Если это подписка - сразу выдаем
             if hasattr(product, 'category') and product.category == 'subscription':
                 item_status = "DELIVERED"
 
-            # Создаем позицию в чеке
-            new_order_item = OrderItem(
-                order_id=new_order.id,
-                product_id=product.id,
-                quantity=cart_item.quantity,
-                price=product.price,
-                status=item_status
-            )
-            db.add(new_order_item)
+            # 🔥 ЗАПУСКАЕМ ЦИКЛ: Крутимся столько раз, сколько штук в корзине
+            for _ in range(cart_item.quantity):
+                # Создаем позицию в чеке (ВСЕГДА ПО 1 ШТУКЕ)
+                new_order_item = OrderItem(
+                    order_id=new_order.id,
+                    product_id=product.id,
+                    quantity=1, # 🔥 Жестко ставим 1
+                    price=product.price,
+                    status=item_status
+                )
+                db.add(new_order_item)
 
             # 4. Сразу удаляем этот товар из корзины
-            await db.delete(cart_item) # 🔥 Асинхронное удаление
+            await db.delete(cart_item)
 
         # 5. Фиксируем все изменения в базе данных разом!
         await db.commit() # 🔥 ДОБАВЛЕН await!

@@ -7,6 +7,7 @@ import {
 import { useUserStore } from '../store/useUserStore';
 import { useDisconnect, useWeb3Modal, useWeb3ModalAccount } from '@web3modal/ethers/react';
 import { OrdersModal } from '../components/OrdersModal';
+import { SubscriptionsModal } from '../components/SubscriptionsModal';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -28,30 +29,33 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
   const { address, isConnected } = useWeb3ModalAccount();
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
-
-  // 🔥 1. НОВЫЙ СТЕЙТ ДЛЯ СИНЕЙ ТОЧКИ
   const [hasNewOrders, setHasNewOrders] = useState(false);
+  const [isSubsOpen, setIsSubsOpen] = useState(false);
 
-  // 🔥 ПРИ ВХОДЕ В ПРОФИЛЬ ПРОВЕРЯЕМ, ЕСТЬ ЛИ НЕПРОСМОТРЕННЫЕ ЗАКАЗЫ
+  // 1. ВЫНОСИМ ЗАПРОС В ОТДЕЛЬНУЮ ФУНКЦИЮ
+  const checkUnseenOrders = () => {
+    if (!tgId) return;
+    fetch(`http://127.0.0.1:8000/api/profile/orders/unseen/${tgId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          // 🔥 ТЕПЕРЬ СТАВИМ РОВНО ТО, ЧТО СКАЗАЛ ПИТОН (true или false)
+          setHasNewOrders(data.has_unseen); 
+        }
+      })
+      .catch(error => console.error("Ошибка при проверке заказов:", error));
+  };
+
+  // 2. ВЫЗЫВАЕМ ПРИ ПЕРВОМ ВХОДЕ В ПРОФИЛЬ
   useEffect(() => {
-    if (tgId) {
-      console.log("Проверяем наличие непросмотренных заказов для tgId:", tgId);
-      fetch(`http://127.0.0.1:8000/api/profile/orders/unseen/${tgId}`)
-        .then(res => res.json())
-        .then(data => {
-          // Если Питон ответил {"success": true, "has_unseen": true}
-          console.log("Ответ от сервера о непросмотренных заказах:", data);
-          if (data.success && data.has_unseen) {
-            setHasNewOrders(true); // Зажигаем синюю пульсирующую точку!
-          }
-        })
-        .catch(error => {
-          console.error("Ошибка при проверке непросмотренных заказов:", error);
-        });
-    }
+    checkUnseenOrders();
   }, [tgId]);
 
-  console.log(hasNewOrders, "🔥 hasNewOrders");
+  // 3. ФУНКЦИЯ ЗАКРЫТИЯ ШТОРКИ (ОНА ЖЕ ОБНОВЛЯЕТ ТОЧКУ)
+  const handleCloseOrders = () => {
+    setIsOrdersOpen(false); // Закрываем шторку
+    checkUnseenOrders();    // 🔥 Стучимся в Питон и проверяем, остались ли еще "NEW" заказы
+  };
 
   
   // Добавь вот эту строчку, чтобы увидеть ТИП переменной:
@@ -378,6 +382,7 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
         <motion.button
           whileTap={{ scale: 0.98 }}
           whileHover={{ backgroundColor: 'rgba(23, 23, 23, 0.8)' }}
+          onClick={() => setIsSubsOpen(true)} // 🔥 ДОБАВЬ ЭТОТ onClick
           style={{
             width: '100%',
             display: 'flex',
@@ -566,12 +571,21 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
         </motion.div>
       )}
       {/* 🔥 НАША НОВАЯ МОДАЛКА В САМОМ НИЗУ */}
+      {/* 🔥 НАША НОВАЯ МОДАЛКА В САМОМ НИЗУ */}
       <OrdersModal 
         isOpen={isOrdersOpen} 
-        onClose={() => setIsOrdersOpen(false)} 
+        onClose={handleCloseOrders} // 🔥 Привязали умную функцию закрытия
         onGoToCart={() => {
-          setIsOrdersOpen(false); // Закрываем модалку
-          onTabChange?.('cart');  // Перекидываем юзера в корзину
+          handleCloseOrders(); // И здесь тоже проверяем статус перед уходом
+          onTabChange?.('cart');
+        }} 
+      />
+      <SubscriptionsModal 
+        isOpen={isSubsOpen} 
+        onClose={() => setIsSubsOpen(false)} 
+        onGoToShop={() => {
+          setIsSubsOpen(false);
+          onTabChange?.('shop'); // Если подписок нет, кидаем в магазин
         }} 
       />
     </motion.div>

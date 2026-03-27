@@ -13,6 +13,14 @@ class OrderViewedRequest(BaseModel):
     tg_id: str
     is_viewed: bool
 
+class MarkViewedRequest(BaseModel):
+    tg_id: str
+    item_id: int
+
+class CancelOrderRequest(BaseModel):
+    tg_id: str
+    item_id: int
+
 router = APIRouter(
     prefix="/api/profile",
     tags=["Profile"]
@@ -58,7 +66,7 @@ async def get_active_orders(tg_id: str, db: AsyncSession = Depends(get_db)):
             "status": display_status,
             "tracking": display_tracking,
             "is_viewed": order.is_viewed, # 🔥 ВОТ НАШ НОВЫЙ ФЛАЖОК
-            "product_id": product.shopify_id
+            "product_id": product.shopify_id,
         })
 
     return {
@@ -116,4 +124,59 @@ async def check_unseen_items(tg_id: str, db: AsyncSession = Depends(get_db)):
     return {
         "success": True, 
         "has_unseen": has_unseen # Вернет True (если есть непросмотренное) или False
+    }
+
+# ЭНДПОИНТ: Меняем статус конкретного заказа на просмотренный
+@router.post("/orders/mark-viewed")
+async def mark_order_viewed(req: MarkViewedRequest, db: AsyncSession = Depends(get_db)):
+    # 1. Ищем позицию в заказе
+    query = select(OrderItem).where(OrderItem.id == req.item_id)
+    item = (await db.execute(query)).scalar_one_or_none()
+    
+    if item:
+        # 2. Ищем сам главный чек (Order) и ставим ему is_viewed = True
+        order_query = select(Order).where(Order.id == item.order_id)
+        order = (await db.execute(order_query)).scalar_one_or_none()
+        
+        if order:
+            order.is_viewed = True
+            await db.commit()
+            return {"success": True}
+            
+    return {"success": False, "error": "Заказ не найден"}
+
+# ЭНДПОИНТ: Отмена заказа и возврат средств
+@router.post("/orders/cancel")
+async def cancel_order(req: CancelOrderRequest, db: AsyncSession = Depends(get_db)):
+    # 1. Ищем юзера по TG ID
+    user_query = select(User).where(User.telegram_id == req.tg_id)
+    user = (await db.execute(user_query)).scalar_one_or_none()
+
+    if not user:
+        return {"success": False, "error": "Пользователь не найден"}
+
+    # 2. Ищем конкретную позицию заказа (OrderItem) по ID
+    item_query = select(OrderItem).where(OrderItem.id == req.item_id)
+    order_item = (await db.execute(item_query)).scalar_one_or_none()
+
+    if not order_item:
+        return {"success": False, "error": "Заказ не найден"}
+
+    # 3. Проверяем, можно ли отменить этот заказ
+    if order_item.status != "PAID_NOT_DELIVERED":
+        return {"success": False, "error": "Этот заказ уже отправлен или отменен"}
+
+    # 4. 💰 ВОЗВРАЩАЕМ ДЕНЬГИ НА БАЛАНС ЮЗЕРА
+    user.internal_balance += order_item.price
+
+    # 5. Меняем статус товара на "CANCELLED" 
+    # (лучше менять статус, а не удалять строку, чтобы оставалась история отмен)
+    order_item.status = "CANCELLED"
+    
+    # 6. Сохраняем изменения в базу данных
+    await db.commit()
+
+    return {
+        "success": True, 
+        "message": f"Заказ отменен. ${order_item.price} возвращено на баланс."
     }

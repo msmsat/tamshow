@@ -88,6 +88,34 @@ export function OrdersModal({ isOpen, onClose, onGoToCart }: OrdersModalProps) {
     }
   };
 
+  // 🔥 ФУНКЦИЯ КЛИКА ПО ЗАКАЗУ
+  const handleOrderClick = async (order: Order) => {
+    // 1. Открываем детальное окно
+    setSelectedOrder(order);
+
+    // 2. Если заказ уже был просмотрен, больше ничего не делаем
+    if (order.is_viewed) return;
+
+    // 3. Мгновенно убираем плашку "NEW" в самом React (чтобы юзер не ждал)
+    setFetchedOrders(prevOrders => 
+      prevOrders.map(o => o.id === order.id ? { ...o, is_viewed: true } : o)
+    );
+
+    // 4. Отправляем Питону команду сохранить это в базу данных
+    try {
+      await fetch('http://127.0.0.1:8000/api/profile/orders/mark-viewed', { // <-- Изменили URL
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          tg_id: tgId, 
+          item_id: order.id // <-- Отправляем ID конкретного заказа
+        })
+      });
+    } catch (error) {
+      console.error("Ошибка при обновлении статуса:", error);
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -113,7 +141,7 @@ export function OrdersModal({ isOpen, onClose, onGoToCart }: OrdersModalProps) {
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             style={{
               position: 'fixed', bottom: 0, left: 0, right: 0,
-              maxHeight: '80vh', overflowY: 'auto', zIndex: 101,
+              maxHeight: '90vh', overflowY: 'auto', zIndex: 101,
               backgroundColor: '#0a0a0a',
               borderTop: '1px solid rgba(168, 85, 247, 0.3)',
               borderRadius: '24px 24px 0 0',
@@ -241,7 +269,7 @@ export function OrdersModal({ isOpen, onClose, onGoToCart }: OrdersModalProps) {
                         <motion.div 
                           key={order.id} 
                           whileTap={{ scale: 0.98 }}
-                          onClick={() => setSelectedOrder(order)} 
+                          onClick={() => handleOrderClick(order)} 
                           style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.04)', borderRadius: '18px', padding: '18px', cursor: 'pointer', transition: 'border-color 0.2s' }}
                           whileHover={{ borderColor: 'rgba(6, 182, 212, 0.3)'}}
                         >
