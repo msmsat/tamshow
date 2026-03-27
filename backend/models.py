@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, Integer, Float, ForeignKey, DateTime, JSON, func
+from sqlalchemy import String, Integer, Float, ForeignKey, DateTime, JSON, func, Boolean
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 # Базовый класс для всех моделей
@@ -63,6 +63,7 @@ class Order(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     total_amount: Mapped[float] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String, default="PENDING") # PENDING, PAID, CANCELLED
+    is_viewed: Mapped[bool] = mapped_column(Boolean, default=False)
     tracking_number: Mapped[Optional[str]] = mapped_column(String)
     payment_ref: Mapped[Optional[str]] = mapped_column(String, unique=True)
     blockchain_tx_hash: Mapped[Optional[str]] = mapped_column(String)

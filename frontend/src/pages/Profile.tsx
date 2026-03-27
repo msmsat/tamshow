@@ -8,13 +8,6 @@ import { useUserStore } from '../store/useUserStore';
 import { useDisconnect, useWeb3Modal, useWeb3ModalAccount } from '@web3modal/ethers/react';
 import { OrdersModal } from '../components/OrdersModal';
 
-// Mock data для демонстрации
-const mockOrders = [
-  { id: 1, name: 'Nexus Hoodie', date: '2024-03-05', status: 'Shipped', tracking: 'TRACK123' },
-  { id: 2, name: 'VIP Pass', date: '2024-02-28', status: 'Delivered', tracking: 'TRACK124' },
-];
-
-
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -28,12 +21,37 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
-export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }) {const { tgId, walletAddress, disconnectWallet, connectWallet } = useUserStore();
+export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }) {
+  const { tgId, walletAddress, disconnectWallet, connectWallet } = useUserStore();
   const { disconnect } = useDisconnect();
   const { open } = useWeb3Modal();
   const { address, isConnected } = useWeb3ModalAccount();
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
+
+  // 🔥 1. НОВЫЙ СТЕЙТ ДЛЯ СИНЕЙ ТОЧКИ
+  const [hasNewOrders, setHasNewOrders] = useState(false);
+
+  // 🔥 ПРИ ВХОДЕ В ПРОФИЛЬ ПРОВЕРЯЕМ, ЕСТЬ ЛИ НЕПРОСМОТРЕННЫЕ ЗАКАЗЫ
+  useEffect(() => {
+    if (tgId) {
+      console.log("Проверяем наличие непросмотренных заказов для tgId:", tgId);
+      fetch(`http://127.0.0.1:8000/api/profile/orders/unseen/${tgId}`)
+        .then(res => res.json())
+        .then(data => {
+          // Если Питон ответил {"success": true, "has_unseen": true}
+          console.log("Ответ от сервера о непросмотренных заказах:", data);
+          if (data.success && data.has_unseen) {
+            setHasNewOrders(true); // Зажигаем синюю пульсирующую точку!
+          }
+        })
+        .catch(error => {
+          console.error("Ошибка при проверке непросмотренных заказов:", error);
+        });
+    }
+  }, [tgId]);
+
+  console.log(hasNewOrders, "🔥 hasNewOrders");
 
   
   // Добавь вот эту строчку, чтобы увидеть ТИП переменной:
@@ -340,7 +358,7 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {mockOrders.length > 0 && (
+            {hasNewOrders && (
               <motion.div
                 animate={{ scale: [1, 1.2, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
@@ -551,7 +569,6 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
       <OrdersModal 
         isOpen={isOrdersOpen} 
         onClose={() => setIsOrdersOpen(false)} 
-        orders={mockOrders} // Передаем фейковые заказы сверху файла (можешь очистить массив, чтобы проверить пустой дизайн)
         onGoToCart={() => {
           setIsOrdersOpen(false); // Закрываем модалку
           onTabChange?.('cart');  // Перекидываем юзера в корзину

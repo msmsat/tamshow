@@ -221,7 +221,8 @@ async def process_payment(req: CheckoutPayRequest, db: AsyncSession = Depends(ge
         new_order = Order(
             user_id=user.id,
             total_amount=total_calculated,
-            status="PAID" # Заказ сразу оплачен
+            status="PAID", # Заказ сразу оплачен
+            is_viewed=False # 🔥 ГАРАНТИРУЕМ, ЧТО ЗАКАЗ НОВЫЙ И НЕПРОСМОТРЕННЫЙ
         )
         db.add(new_order)
         await db.flush() # 🔥 ДОБАВЛЕН await! Получаем ID заказа
