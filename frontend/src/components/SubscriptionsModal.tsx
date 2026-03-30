@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, X, ArrowRight, ShieldCheck } from 'lucide-react';
 import { ALL_PRODUCTS } from '../store/products';
+import { useUserStore } from '../store/useUserStore';
 
-// Временный интерфейс для визуализации
+// 🔥 1. Правильно описываем то, что реально присылает Питон
 interface Subscription {
   id: number;
-  name: string;
-  date: string;
+  type: string;       // Бэкенд шлет type (например "VIP Pass")
   status: string;
-  product_id: string;
+  start_date: string; // Бэкенд шлет start_date
+  end_date: string;
 }
 
 interface SubscriptionsModalProps {
@@ -19,32 +20,39 @@ interface SubscriptionsModalProps {
 }
 
 export function SubscriptionsModal({ isOpen, onClose, onGoToShop }: SubscriptionsModalProps) {
-  // 🔥 ВРЕМЕННЫЕ ДАННЫЕ ДЛЯ ТЕСТА ВИЗУАЛА
-  const mockSubs: Subscription[] = [
-    {
-      id: 1,
-      name: "VIP Pass",
-      date: "2024-03-25",
-      status: "Active VIP",
-      product_id: "2" // ID из твоего ALL_PRODUCTS
-    },
-    {
-      id: 2,
-      name: "NFT Blueprint",
-      date: "2024-03-26",
-      status: "Verified",
-      product_id: "4" // ID из твоего ALL_PRODUCTS
-    }
-  ];
+  const { tgId } = useUserStore();
+  // 🔥 2. Используем наш правильный интерфейс
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [fetchedSubs, setFetchedSubs] = useState<Subscription[]>([]);
-
-  // При открытии модалки сразу подгружаем игрушечные данные
   useEffect(() => {
-    if (isOpen) {
-      setFetchedSubs(mockSubs);
+    // Делаем запрос только если модалка открыта и есть tgId
+    if (isOpen && tgId) {
+      const fetchSubscriptions = async () => {
+        setIsLoading(true);
+        try {
+          // 🔥 Тот самый новый путь
+          const response = await fetch(`/api/shop/subscriptions?telegram_id=${tgId}`);
+          
+          if (!response.ok) throw new Error("Ошибка сети");
+          
+          const result = await response.json();
+          if (result.status === "success") {
+            setSubscriptions(result.data);
+          } else {
+            setSubscriptions([]);
+          }
+        } catch (error) {
+          console.error("Ошибка при загрузке подписок:", error);
+          setSubscriptions([]);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchSubscriptions();
     }
-  }, [isOpen]);
+  }, [isOpen, tgId]);
 
   return (
     <AnimatePresence>
@@ -84,7 +92,11 @@ export function SubscriptionsModal({ isOpen, onClose, onGoToShop }: Subscription
             <div style={{width: '100%', height: '1px', background: 'linear-gradient(90deg, rgba(6,182,212,0) 0%, rgba(6,182,212,0.5) 50%, rgba(6,182,212,0) 100%)', marginBottom: '20px'}}></div>
 
             {/* Контент */}
-            {fetchedSubs.length === 0 ? (
+            {isLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#06b6d4', fontWeight: 'bold' }}>
+                Loading subscriptions...
+              </div>
+            ) : subscriptions.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 0 20px' }}>
                 <div style={{ width: '64px', height: '64px', backgroundColor: 'rgba(6, 182, 212, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
                   <ShieldCheck size={32} color="#06b6d4" />
@@ -100,29 +112,37 @@ export function SubscriptionsModal({ isOpen, onClose, onGoToShop }: Subscription
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '20px' }}>
-                {fetchedSubs.map(sub => (
-                  <motion.div 
-                    key={sub.id} 
-                    style={{ backgroundColor: 'rgba(6, 182, 212, 0.05)', border: '1px solid rgba(6, 182, 212, 0.2)', borderRadius: '18px', padding: '18px', display: 'flex', alignItems: 'center', gap: '16px' }}
-                  >
-                    {/* Картинка товара */}
-                    <div style={{ width: '60px', height: '60px', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#1a1a1a', flexShrink: 0 }}>
-                        <img 
-                          src={ALL_PRODUCTS.find(p => p.id === sub.product_id)?.image || '/placeholder.webp'} 
-                          alt={sub.name} 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                        />
-                    </div>
-                    {/* Информация */}
-                    <div style={{ flex: 1 }}>
-                        <h4 style={{ color: '#ffffff', margin: '0 0 6px 0', fontSize: '16px', fontWeight: 600 }}>{sub.name}</h4>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '11px', color: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.1)', padding: '4px 8px', borderRadius: '6px', fontWeight: 800 }}>{sub.status}</span>
-                            <span style={{ fontSize: '11px', color: '#6b7280' }}>Since {sub.date}</span>
-                        </div>
-                    </div>
-                  </motion.div>
-                ))}
+                {subscriptions.map(sub => {
+                  // 🔥 3. Ищем картинку в базе ALL_PRODUCTS по названию (type), так как product_id тут нет
+                  const matchedProduct = ALL_PRODUCTS.find(p => p.title === sub.type);
+                  const imageUrl = matchedProduct ? matchedProduct.image : '/pass.webp'; // дефолтная картинка, если не нашли
+
+                  return (
+                    <motion.div 
+                      key={sub.id} 
+                      style={{ backgroundColor: 'rgba(6, 182, 212, 0.05)', border: '1px solid rgba(6, 182, 212, 0.2)', borderRadius: '18px', padding: '18px', display: 'flex', alignItems: 'center', gap: '16px' }}
+                    >
+                      <div style={{ width: '60px', height: '60px', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#1a1a1a', flexShrink: 0 }}>
+                          <img 
+                            src={imageUrl} 
+                            alt={sub.type} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                          />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                          {/* 🔥 4. Выводим sub.type вместо sub.name */}
+                          <h4 style={{ color: '#ffffff', margin: '0 0 6px 0', fontSize: '16px', fontWeight: 600 }}>{sub.type}</h4>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '11px', color: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.1)', padding: '4px 8px', borderRadius: '6px', fontWeight: 800 }}>{sub.status}</span>
+                              {/* 🔥 5. Выводим sub.start_date вместо sub.date */}
+                              {sub.start_date && (
+                                <span style={{ fontSize: '11px', color: '#6b7280' }}>Since {sub.start_date}</span>
+                              )}
+                          </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
             )}
           </motion.div>

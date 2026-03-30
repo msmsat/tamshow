@@ -5,8 +5,9 @@ export interface Product {
   title: string;
   price: number;
   description: string;
+  category: 'merch' | 'subscription'; // или просто string
   image: string;
-  category: 'merch' | 'subscription';
+  is_bought?: boolean; // 🔥 ВОТ ЭТА СТРОЧКА СПАСЕТ СИТУАЦИЮ
 }
 
 export interface CartItem extends Product {

@@ -5,15 +5,61 @@ import { ProductCard } from '../components/ProductCard';
 import { useUserStore } from '../store/useUserStore';
 import { useUIStore } from '../store/useUIStore';
 import type { Product } from '../store/types';
+import { useEffect, useState } from 'react';
 
-const FEATURED_PRODUCTS: Product[] = [
-  { id: '1', image: '/sweater.webp', title: 'Nexus Hoodie', price: 4999, description: 'Limited edition cyberpunk merch', category: 'merch' },
-  { id: '2', image: '/pass.webp', title: 'VIP Pass', price: 9999, description: '12-month exclusive access', category: 'subscription' },
-];
 
 export function Home({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { selectProduct } = useUIStore();
-  const { walletAddress } = useUserStore();
+  const { walletAddress, tgId } = useUserStore();
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+
+  // 2. Делаем запрос к нашему API при загрузке компонента или изменении tgId
+  console.log("Текущий tgId из стора:", tgId); // <-- Добавляем лог для проверки
+  useEffect(() => {
+    async function loadProducts() {
+      // Если tgId еще не успел подгрузиться из стора, ничего не делаем
+      console.log("Проверяем tgId перед загрузкой продуктов:", tgId); // <-- Логируем значение tgId перед загрузкой
+      if (!tgId) return; 
+
+      // 🛠 ТЕСТОВЫЙ ЗАПРОС ПЕРЕД ОСНОВНЫМ
+      try {
+        console.log("⏳ Отправляем тестовый PING...");
+        const pingResponse = await fetch('/api/shop/ping');
+        const pingData = await pingResponse.json();
+        console.log("✅ УСПЕХ PING:", pingData);
+      } catch (e) {
+        console.error("❌ ОШИБКА PING (Скорее всего опять пришел HTML):", e);
+      }
+
+      console.log("Загружаем продукты для tgId:", tgId); // <-- Логируем, что начинаем загрузку
+      try {
+        const response = await fetch(`/api/shop/products?telegram_id=${tgId}&limit=2`);
+        console.log("Загружаем продукты для tgId:", tgId); // <-- Логируем, что начинаем загрузку
+        console.log("Ответ от API:", response); // <-- Логируем ответ от API
+        if (response.ok) {
+          const result = await response.json();
+          
+          // 3. Форматируем то, что пришло с бэка, под твой тип Product
+          const formattedProducts: Product[] = result.data.map((item: any) => ({
+            id: String(item.id),
+            title: item.title,         // 🔥 Бэкенд уже шлет title!
+            price: item.price,
+            description: item.description,
+            category: item.category as 'merch' | 'subscription', // 🔥 Говорим TypeScript точный тип
+            is_bought: item.is_bought, 
+            image: item.image          // 🔥 Бэкенд уже шлет картинку!
+          }));
+
+          // 4. Обновляем состояние
+          setFeaturedProducts(formattedProducts);
+        }
+      } catch (error) {
+        console.error("Ошибка при загрузке товаров:", error);
+      }
+    }
+
+    loadProducts();
+  }, [tgId]);
 
   return (
     <div style={{
@@ -286,7 +332,7 @@ export function Home({ onTabChange }: { onTabChange?: (tab: string) => void }) {
           gridTemplateColumns: '1fr 1fr',
           gap: '16px'
         }}>
-          {FEATURED_PRODUCTS.map(product => (
+          {featuredProducts.map(product => (
             <ProductCard 
               key={product.id} 
               {...product}

@@ -61,7 +61,7 @@ async def get_active_orders(tg_id: str, db: AsyncSession = Depends(get_db)):
 
         active_orders.append({
             "id": order_item.id, # Уникальный ID позиции в заказе
-            "name": product.name, # Название худи/товара
+            "name": product.title, # Название худи/товара
             "date": order.created_at.strftime("%Y-%m-%d"), # Красивая дата (например, 2024-03-26)
             "status": display_status,
             "tracking": display_tracking,

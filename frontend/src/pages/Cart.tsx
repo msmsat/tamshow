@@ -9,6 +9,8 @@ import { ALL_PRODUCTS } from '../store/products';
 import { QRCodeSVG } from 'qrcode.react';
 import { X } from 'lucide-react';
 
+// 🔥 Константа для максимального количества мерча в корзине
+const MAX_MERCH_QUANTITY = 10;
 
 export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { walletAddress } = useUserStore();

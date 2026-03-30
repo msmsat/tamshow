@@ -5,7 +5,8 @@ from sqlalchemy.future import select
 
 # Импортируем вашу функцию для БД и новую модель
 from database import get_db
-from models import CartItem, User, Product, Order, OrderItem
+from datetime import datetime, timedelta
+from models import CartItem, User, Product, Order, OrderItem, Subscription
 
 # Создаем роутер с префиксом, чтобы не писать /api/cart каждый раз
 router = APIRouter(
@@ -222,20 +223,17 @@ async def process_payment(req: CheckoutPayRequest, db: AsyncSession = Depends(ge
             user_id=user.id,
             total_amount=total_calculated,
             status="PAID", # Заказ сразу оплачен
-            is_viewed=False # 🔥 ГАРАНТИРУЕМ, ЧТО ЗАКАЗ НОВЫЙ И НЕПРОСМОТРЕННЫЙ
+            is_viewed=False # ГАРАНТИРУЕМ, ЧТО ЗАКАЗ НОВЫЙ И НЕПРОСМОТРЕННЫЙ
         )
         db.add(new_order)
-        await db.flush() # 🔥 ДОБАВЛЕН await! Получаем ID заказа
+        await db.flush() # Получаем ID заказа
 
         # 3. Переносим товары из корзины в чек
-        # У нас УЖЕ ЕСТЬ переменная items_with_products из начала функции,
-        # поэтому нам не нужно делать новые запросы к БД!
-        # 3. Переносим товары из корзины в чек (ПОШТУЧНО)
         for cart_item, product in items_with_products:
             
-            item_status = "PAID_NOT_DELIVERED"
-            if hasattr(product, 'category') and product.category == 'subscription':
-                item_status = "DELIVERED"
+            # Проверяем, подписка это или обычный мерч
+            is_subscription = hasattr(product, 'category') and product.category == 'subscription'
+            item_status = "DELIVERED" if is_subscription else "PAID_NOT_DELIVERED"
 
             # 🔥 ЗАПУСКАЕМ ЦИКЛ: Крутимся столько раз, сколько штук в корзине
             for _ in range(cart_item.quantity):
@@ -243,17 +241,29 @@ async def process_payment(req: CheckoutPayRequest, db: AsyncSession = Depends(ge
                 new_order_item = OrderItem(
                     order_id=new_order.id,
                     product_id=product.id,
-                    quantity=1, # 🔥 Жестко ставим 1
+                    quantity=1, # Жестко ставим 1
                     price=product.price,
                     status=item_status
                 )
                 db.add(new_order_item)
 
+            # 🔥 НОВОЕ: Отправляем подписку в таблицу Subscriptions (СТРОГО ОДИН РАЗ)
+            # Мы вынесли это ЗА пределы цикла quantity, поэтому добавится только 1 подписка!
+            if is_subscription:
+                new_subscription = Subscription(
+                    user_id=user.id,
+                    type=product.title,  # Берем название (например, VIP Pass)
+                    status="ACTIVE",
+                    start_date=datetime.now(),
+                    end_date=datetime.now() + timedelta(days=365) # Выдаем на 1 год (можно изменить)
+                )
+                db.add(new_subscription)
+
             # 4. Сразу удаляем этот товар из корзины
             await db.delete(cart_item)
 
         # 5. Фиксируем все изменения в базе данных разом!
-        await db.commit() # 🔥 ДОБАВЛЕН await!
+        await db.commit()
 
         return {
             "success": True,
@@ -261,7 +271,7 @@ async def process_payment(req: CheckoutPayRequest, db: AsyncSession = Depends(ge
         }
 
     except Exception as e:
-        await db.rollback() # 🔥 ДОБАВЛЕН await! Если ошибка - отменяем списание
+        await db.rollback() # Если ошибка - отменяем списание
         print(f"Ошибка при сохранении заказа: {e}")
         return {
             "success": False,

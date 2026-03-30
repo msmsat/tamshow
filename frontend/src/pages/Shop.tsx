@@ -1,25 +1,51 @@
 import { Search } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ProductCard } from '../components/ProductCard';
 import { useUserStore } from '../store/useUserStore';
 import { useUIStore } from '../store/useUIStore';
-import { ALL_PRODUCTS } from '../store/products'; // Путь к новому файлу
+import type { Product } from '../store/types';
 
 type FilterType = 'all' | 'merch' | 'subscription';
 
 export function Shop() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
-  const { isVip } = useUserStore();
+  const { isVip, tgId } = useUserStore();
   const { selectProduct } = useUIStore();
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
 
-  // Фильтрация товаров
-  const filteredProducts = ALL_PRODUCTS.filter(product => {
-    const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          product.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filter === 'all' || product.category === filter;
-    return matchesSearch && matchesFilter;
-  });
+  useEffect(() => {
+    async function loadProducts() {
+      // Если tgId еще не успел подгрузиться из стора, ничего не делаем
+      if (!tgId) return; 
+
+      try {
+        const response = await fetch(`/api/shop/products?telegram_id=${tgId}`);
+        
+        if (response.ok) {
+          const result = await response.json();
+          
+          // 3. Форматируем то, что пришло с бэка, под твой тип Product
+          const formattedProducts: Product[] = result.data.map((item: any) => ({
+            id: String(item.id),
+            title: item.title,         // ✅ Теперь берем title прямо из БД
+            price: item.price,
+            description: item.description,
+            category: item.category,
+            image: item.image,         // ✅ Теперь берем картинку прямо из БД!
+            is_bought: item.is_bought
+          }));
+
+          // 4. Обновляем состояние
+          setFeaturedProducts(formattedProducts);
+        }
+      } catch (error) {
+        console.error("Ошибка при загрузке товаров:", error);
+      }
+    }
+
+    loadProducts();
+  }, [tgId]);
 
   const categories: { label: string; value: FilterType }[] = [
     { label: 'All', value: 'all' },
@@ -139,13 +165,13 @@ export function Shop() {
       )}
 
       {/* Сетка товаров */}
-      {filteredProducts.length > 0 ? (
+      {featuredProducts.length > 0 ? (
         <div style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
           gap: '16px'
         }}>
-          {filteredProducts.map(product => (
+          {featuredProducts.map(product => (
             <ProductCard 
               key={product.id} 
               {...product}

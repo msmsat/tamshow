@@ -33,11 +33,13 @@ class Product(Base):
     __tablename__ = "products"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String)
+    title: Mapped[str] = mapped_column(String) # 🔥 Переименовали name в title
     description: Mapped[Optional[str]] = mapped_column(String)
     price: Mapped[float] = mapped_column(Float)
+    image: Mapped[str] = mapped_column(String) # 🔥 Добавили колонку для картинки
     stock: Mapped[int] = mapped_column(Integer, default=0)
     shopify_id: Mapped[Optional[str]] = mapped_column(String, unique=True, index=True)
+    category: Mapped[str] = mapped_column(String, default="merch")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 # 3️⃣ Подписки (subscriptions)
@@ -87,7 +89,7 @@ class OrderItem(Base):
     # 📦 НОВОЕ ПОЛЕ: Статус конкретного товара в заказе
     # Статусы: "PAID_NOT_DELIVERED" (оплачено, ждет выдачи), "DELIVERED" (выдано), "REFUNDED"
     status: Mapped[str] = mapped_column(String, default="PAID_NOT_DELIVERED")
-
+    
     order: Mapped["Order"] = relationship(back_populates="items")
     product: Mapped["Product"] = relationship()
 
