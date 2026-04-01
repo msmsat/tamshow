@@ -21,6 +21,9 @@ class User(Base):
     email: Mapped[Optional[str]] = mapped_column(String, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     internal_balance: Mapped[float] = mapped_column(Float, default=0.0)
+    usr_adress: Mapped[Optional[str]] = mapped_column(String) # 🔥 Новый столбец для адреса доставки мерча
+    usr_lat: Mapped[Optional[float]] = mapped_column(Float)  # Широта адреса доставки
+    usr_lon: Mapped[Optional[float]] = mapped_column(Float)  # Долгота адреса доставки
 
     # Связи
     subscriptions: Mapped[List["Subscription"]] = relationship(back_populates="user")

@@ -61,7 +61,9 @@ export function AiChat() {
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const chatHistory = [...messages, userMessage];
+    
+    setMessages(chatHistory);
     setInput('');
     setIsTyping(true);
 
@@ -74,17 +76,17 @@ export function AiChat() {
     }, 60000);
 
     // 2. ОТПРАВЛЯЕМ НА БЭКЕНД И ЖДЕМ (НАСТОЯЩАЯ ГЕНЕРАЦИЯ)
-    console.log("Отправляем на FastAPI:", userMessage.content);
+    console.log("Отправляем на FastAPI:", chatHistory);
     try {
       console.log("Стучимся на FastAPI...");
       // Стучимся на ваш FastAPI сервер (адрес поменяете на свой, если нужно)
-      const response = await fetch('http://127.0.0.1:8000/api/ai-chat', {
+      const response = await fetch('https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/ai-chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         // Отправляем текст юзера в формате JSON
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({ message: chatHistory }),
         signal: controller.signal
       });
       console.log("Ответ от FastAPI (raw):", response);
@@ -240,7 +242,16 @@ export function AiChat() {
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word'
               }}>
-                <ReactMarkdown>{message.content}</ReactMarkdown>
+                <ReactMarkdown
+                  components={{
+                    // Принудительно задаем отступ слева и стиль точек
+                    ul: ({ node, ...props }) => <ul style={{ paddingLeft: '24px', marginTop: '8px', marginBottom: '8px', listStyleType: 'disc' }} {...props} />,
+                    ol: ({ node, ...props }) => <ol style={{ paddingLeft: '24px', marginTop: '8px', marginBottom: '8px', listStyleType: 'decimal' }} {...props} />,
+                    li: ({ node, ...props }) => <li style={{ marginBottom: '4px' }} {...props} />,
+                    // Заодно делаем аккуратные отступы между абзацами
+                    p: ({ node, ...props }) => <p style={{ marginTop: 0, marginBottom: '8px' }} {...props} />
+                  }}
+                >{message.content}</ReactMarkdown>
               </div>
             ) : (
               <div style={{
@@ -252,11 +263,19 @@ export function AiChat() {
                 fontSize: '13px',
                 lineHeight: '1.5',
                 maxWidth: '85%',
-                whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
                 boxShadow: '0 0 15px -5px #a855f7'
               }}>
-                <ReactMarkdown>{message.content}</ReactMarkdown>
+                <ReactMarkdown
+                  components={{
+                    // Принудительно задаем отступ слева и стиль точек
+                    ul: ({ node, ...props }) => <ul style={{ paddingLeft: '24px', marginTop: '8px', marginBottom: '8px', listStyleType: 'disc' }} {...props} />,
+                    ol: ({ node, ...props }) => <ol style={{ paddingLeft: '24px', marginTop: '8px', marginBottom: '8px', listStyleType: 'decimal' }} {...props} />,
+                    li: ({ node, ...props }) => <li style={{ marginBottom: '4px' }} {...props} />,
+                    // Заодно делаем аккуратные отступы между абзацами
+                    p: ({ node, ...props }) => <p style={{ marginTop: 0, marginBottom: '8px' }} {...props} />
+                  }}
+                >{message.content}</ReactMarkdown>
               </div>
             )}
           </motion.div>

@@ -27,7 +27,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     
     // 2. ДОБАВЛЯЕМ ВОТ ЭТОТ БЛОК В САМЫЙ КОНЕЦ ФУНКЦИИ:
     try {
-      await fetch('http://127.0.0.1:8000/api/cart/add', {
+      await fetch('https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/cart/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -43,7 +43,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   },
   fetchCart: async (tgId: string, allProducts: Product[]) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/cart/${tgId}`);
+      const response = await fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/cart/${tgId}`);
       if (response.ok) {
         const data = await response.json(); // Приходит: { cart: [{id: "1", quantity: 2}] }
         
@@ -73,7 +73,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
     // 2. Отправляем запрос Питону на полное удаление
     try {
-      await fetch('http://127.0.0.1:8000/api/cart/remove', {
+      await fetch('https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/cart/remove', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -104,7 +104,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
     // 2. Отправляем новое точное количество в Питон
     try {
-      await fetch('http://127.0.0.1:8000/api/cart/update', {
+      await fetch('https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/cart/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

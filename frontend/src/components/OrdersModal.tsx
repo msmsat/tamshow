@@ -38,7 +38,7 @@ export function OrdersModal({ isOpen, onClose, onGoToCart }: OrdersModalProps) {
       const fetchOrders = async () => {
         setIsLoading(true);
         try {
-          const response = await fetch(`http://127.0.0.1:8000/api/profile/orders/${tgId}`);
+          const response = await fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/profile/orders/${tgId}`);
           if (!response.ok) throw new Error("Ошибка сети");
           
           const data = await response.json();
@@ -65,7 +65,7 @@ export function OrdersModal({ isOpen, onClose, onGoToCart }: OrdersModalProps) {
     
     setIsCancelling(true);
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/profile/orders/cancel`, {
+      const response = await fetch(`/api/profile/orders/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tg_id: tgId, item_id: itemId })
@@ -103,7 +103,7 @@ export function OrdersModal({ isOpen, onClose, onGoToCart }: OrdersModalProps) {
 
     // 4. Отправляем Питону команду сохранить это в базу данных
     try {
-      await fetch('http://127.0.0.1:8000/api/profile/orders/mark-viewed', { // <-- Изменили URL
+      await fetch('/api/profile/orders/mark-viewed', { // <-- Изменили URL
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

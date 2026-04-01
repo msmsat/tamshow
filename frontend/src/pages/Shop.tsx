@@ -53,6 +53,16 @@ export function Shop() {
     { label: 'Subscriptions', value: 'subscription' },
   ];
 
+  const filteredProducts = featuredProducts.filter(product => {
+    // 1. Проверяем категорию
+    const matchesCategory = filter === 'all' || product.category === filter;
+    
+    // 2. Проверяем поиск (по названию)
+    const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return matchesCategory && matchesSearch;
+  });
+
   return (
     <div style={{
       display: 'flex',
@@ -165,13 +175,13 @@ export function Shop() {
       )}
 
       {/* Сетка товаров */}
-      {featuredProducts.length > 0 ? (
+      {filteredProducts.length > 0 ? (
         <div style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
           gap: '16px'
         }}>
-          {featuredProducts.map(product => (
+          {filteredProducts.map(product => (
             <ProductCard 
               key={product.id} 
               {...product}

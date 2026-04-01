@@ -8,6 +8,8 @@ import { useUserStore } from '../store/useUserStore';
 import { useDisconnect, useWeb3Modal, useWeb3ModalAccount } from '@web3modal/ethers/react';
 import { OrdersModal } from '../components/OrdersModal';
 import { SubscriptionsModal } from '../components/SubscriptionsModal';
+import { DeliveryMapModal } from '../components/DeliveryMapModal';
+import { SettingsModal } from '../components/SettingsModal';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -31,11 +33,37 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
   const [hasNewOrders, setHasNewOrders] = useState(false);
   const [isSubsOpen, setIsSubsOpen] = useState(false);
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState<string | null>(null);
+  const [deliveryLat, setDeliveryLat] = useState<number | null>(null);
+  const [deliveryLon, setDeliveryLon] = useState<number | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const { fetchUserInfo } = useUserStore();
+
+  const fetchAddress = () => {
+    if (!tgId) return;
+    fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/profile/address/${tgId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setDeliveryAddress(data.address || null);
+          setDeliveryLat(data.lat ?? null);
+          setDeliveryLon(data.lon ?? null);
+        }
+      })
+      .catch(error => console.error("Ошибка при загрузке адреса:", error));
+  };
+
+  useEffect(() => {
+    checkUnseenOrders();
+    fetchAddress(); // 🔥 3. ВЫЗЫВАЕМ ПРИ ЗАГРУЗКЕ
+    fetchUserInfo();
+  }, [tgId]);
 
   // 1. ВЫНОСИМ ЗАПРОС В ОТДЕЛЬНУЮ ФУНКЦИЮ
   const checkUnseenOrders = () => {
     if (!tgId) return;
-    fetch(`http://127.0.0.1:8000/api/profile/orders/unseen/${tgId}`)
+    fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/profile/orders/unseen/${tgId}`)
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -410,6 +438,7 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
         <motion.button
           whileTap={{ scale: 0.98 }}
           whileHover={{ backgroundColor: 'rgba(23, 23, 23, 0.8)' }}
+          onClick={() => setIsMapModalOpen(true)} // 🔥 ДОБАВЬ ВОТ ЭТУ СТРОЧКУ
           style={{
             width: '100%',
             display: 'flex',
@@ -437,6 +466,7 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
         <motion.button
           whileTap={{ scale: 0.98 }}
           whileHover={{ backgroundColor: 'rgba(23, 23, 23, 0.8)' }}
+          onClick={() => setIsSettingsOpen(true)} // 🔥 Открываем модалку
           style={{
             width: '100%',
             display: 'flex',
@@ -571,7 +601,6 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
         </motion.div>
       )}
       {/* 🔥 НАША НОВАЯ МОДАЛКА В САМОМ НИЗУ */}
-      {/* 🔥 НАША НОВАЯ МОДАЛКА В САМОМ НИЗУ */}
       <OrdersModal 
         isOpen={isOrdersOpen} 
         onClose={handleCloseOrders} // 🔥 Привязали умную функцию закрытия
@@ -587,6 +616,42 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
           setIsSubsOpen(false);
           onTabChange?.('shop'); // Если подписок нет, кидаем в магазин
         }} 
+      />
+      <DeliveryMapModal 
+        isOpen={isMapModalOpen} 
+        onClose={() => setIsMapModalOpen(false)} 
+        currentAddress={deliveryAddress}
+        currentLat={deliveryLat}
+        currentLon={deliveryLon}
+        onConfirm={async (address, lat, lon) => {
+          try {
+            const response = await fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/profile/update-address`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                tg_id: tgId, 
+                address: address,
+                lat: lat,
+                lon: lon
+              })
+            });
+            const data = await response.json();
+            if (data.success) {
+              setDeliveryAddress(address);
+              setDeliveryLat(lat);
+              setDeliveryLon(lon);
+            } else {
+              alert("Failed to save address.");
+            }
+          } catch (err) {
+            console.error(err);
+            alert("Network error.");
+          }
+        }}
+      />
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
       />
     </motion.div>
   );

@@ -10,7 +10,6 @@ import { QRCodeSVG } from 'qrcode.react';
 import { X } from 'lucide-react';
 
 // 🔥 Константа для максимального количества мерча в корзине
-const MAX_MERCH_QUANTITY = 10;
 
 export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { walletAddress } = useUserStore();
@@ -314,46 +313,76 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
                     </div>
                   </div>
 
-                  {/* Quantity Adjuster - Glass Capsule */}
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: '12px',
-                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '24px',
-                    paddingLeft: '8px', paddingRight: '8px', paddingTop: '6px', paddingBottom: '6px',
-                    flexShrink: 0
-                  }}>
+                  {/* Quantity Adjuster - Glass Capsule or Trash Only */}
+                  {item.category === 'subscription' ? (
+                    // 🔥 ЕСЛИ ПОДПИСКА — ПОКАЗЫВАЕМ ТОЛЬКО МУСОРКУ
                     <button
-                      onClick={() => handleQuantityChange(item.id, -1)}
+                      onClick={() => removeFromCart(item.id)}
                       style={{
-                        background: 'none', border: 'none',
-                        color: item.quantity === 1 ? '#ef4444' : '#9ca3af',
-                        cursor: 'pointer', padding: '4px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'color 0.2s'
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                        borderRadius: '12px',
+                        width: '36px',
+                        height: '36px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        transition: 'all 0.2s'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = item.quantity === 1 ? '#ff6b6b' : '#d1d5db'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = item.quantity === 1 ? '#ef4444' : '#9ca3af'}
-                    >
-                      {item.quantity === 1 ? <Trash2 size={16} /> : <Minus size={16} />}
-                    </button>
-
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', minWidth: '16px', textAlign: 'center' }}>
-                      {item.quantity}
-                    </span>
-
-                    <button
-                      onClick={() => handleQuantityChange(item.id, 1)}
-                      style={{
-                        background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'color 0.2s'
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = '#d1d5db'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                      }}
                     >
-                      <Plus size={16} />
+                      <Trash2 size={18} />
                     </button>
-                  </div>
+                  ) : (
+                    // 📦 ЕСЛИ МЕРЧ — ПОКАЗЫВАЕМ СТАНДАРТНЫЙ ПЕРЕКЛЮЧАТЕЛЬ [ - 1 + ]
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '12px',
+                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '24px',
+                      paddingLeft: '8px', paddingRight: '8px', paddingTop: '6px', paddingBottom: '6px',
+                      flexShrink: 0
+                    }}>
+                      <button
+                        onClick={() => handleQuantityChange(item.id, -1)}
+                        style={{
+                          background: 'none', border: 'none',
+                          color: item.quantity === 1 ? '#ef4444' : '#9ca3af',
+                          cursor: 'pointer', padding: '4px',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'color 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = item.quantity === 1 ? '#ff6b6b' : '#d1d5db'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = item.quantity === 1 ? '#ef4444' : '#9ca3af'}
+                      >
+                        {item.quantity === 1 ? <Trash2 size={16} /> : <Minus size={16} />}
+                      </button>
+
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#ffffff', minWidth: '16px', textAlign: 'center' }}>
+                        {item.quantity}
+                      </span>
+
+                      <button
+                        onClick={() => handleQuantityChange(item.id, 1)}
+                        style={{
+                          background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'color 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#d1d5db'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  )}
 
                 </div>
               </div>
@@ -477,7 +506,7 @@ export function CheckoutFooter() {
     
     setIsFetchingAddress(true);
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/wallet/get-address?tg_id=${tgId}`);
+      const response = await fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/wallet/get-address?tg_id=${tgId}`);
       
       if (!response.ok) {
         throw new Error('Network response was not ok');
@@ -503,7 +532,7 @@ export function CheckoutFooter() {
     setIsFetchingAddress(true); 
     
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/cart/checkout-preview/${tgId}`);
+      const response = await fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/cart/checkout-preview/${tgId}`);
       if (!response.ok) throw new Error('Network error');
       
       const data = await response.json();
@@ -535,7 +564,7 @@ export function CheckoutFooter() {
     setIsPaying(true); // Включаем загрузку на кнопке
     
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/cart/pay`, {
+      const response = await fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/cart/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

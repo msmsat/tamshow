@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, desc, asc
@@ -20,6 +20,17 @@ class MarkViewedRequest(BaseModel):
 class CancelOrderRequest(BaseModel):
     tg_id: str
     item_id: int
+
+class UpdateAddressRequest(BaseModel):
+    tg_id: str
+    address: str
+    lat: float | None = None
+    lon: float | None = None
+
+# 1. Схема для получения данных от фронтенда
+class UpdateWalletRequest(BaseModel):
+    telegram_id: str
+    wallet_address: str
 
 router = APIRouter(
     prefix="/api/profile",
@@ -109,11 +120,17 @@ async def check_unseen_items(tg_id: str, db: AsyncSession = Depends(get_db)):
     if not user:
         return {"success": False, "has_unseen": False}
 
-    # 2. Ищем в БД то, на что юзер еще НЕ обратил внимание (is_viewed == False)
-    query = select(Order).where(
-        Order.user_id == user.id, 
-        Order.is_viewed == False
+    # 2. 🔥 УМНЫЙ ЗАПРОС: Ищем непросмотренные чеки, НО ТОЛЬКО если в них есть "PAID_NOT_DELIVERED" товары
+    query = (
+        select(Order)
+        .join(OrderItem, OrderItem.order_id == Order.id)
+        .where(
+            Order.user_id == user.id, 
+            Order.is_viewed == False,
+            OrderItem.status == "PAID_NOT_DELIVERED" # <- ВОТ ЭТА СТРОЧКА РЕШАЕТ ПРОБЛЕМУ
+        )
     )
+    
     print(f"Проверяем наличие непросмотренных заказов для пользователя {tg_id} (user_id={user.id})...")
     result = await db.execute(query)
     
@@ -123,7 +140,7 @@ async def check_unseen_items(tg_id: str, db: AsyncSession = Depends(get_db)):
 
     return {
         "success": True, 
-        "has_unseen": has_unseen # Вернет True (если есть непросмотренное) или False
+        "has_unseen": has_unseen
     }
 
 # ЭНДПОИНТ: Меняем статус конкретного заказа на просмотренный
@@ -179,4 +196,79 @@ async def cancel_order(req: CancelOrderRequest, db: AsyncSession = Depends(get_d
     return {
         "success": True, 
         "message": f"Заказ отменен. ${order_item.price} возвращено на баланс."
+    }
+
+@router.post("/update-address")
+async def update_user_address(req: UpdateAddressRequest, db: AsyncSession = Depends(get_db)):
+    # Ищем пользователя
+    query = select(User).where(User.telegram_id == req.tg_id)
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        return {"success": False, "error": "Пользователь не найден"}
+
+    # Сохраняем адрес и координаты
+    user.usr_adress = req.address
+    user.usr_lat = req.lat
+    user.usr_lon = req.lon
+    await db.commit()
+
+    return {"success": True, "message": "Address and coordinates updated successfully"}
+
+# 2. Сам эндпоинт для сохранения адреса
+@router.post("/update_wallet")
+async def update_wallet(
+    data: UpdateWalletRequest, 
+    db: AsyncSession = Depends(get_db)
+):
+    # Ищем пользователя по telegram_id
+    query = select(User).where(User.telegram_id == data.telegram_id)
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    # Обновляем адрес кошелька
+    user.wallet_address = data.wallet_address
+    await db.commit()
+
+    return {
+        "status": "success", 
+        "message": "Адрес успешно обновлен", 
+        "wallet_address": user.wallet_address
+    }
+
+@router.get("/address/{tg_id}")
+async def get_address(tg_id: str, db: AsyncSession = Depends(get_db)):
+    query = select(User).where(User.telegram_id == tg_id)
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
+    if not user:
+        return {"success": False, "address": None, "lat": None, "lon": None}
+    return {
+        "success": True,
+        "address": user.usr_adress,
+        "lat": user.usr_lat,
+        "lon": user.usr_lon
+    }
+
+@router.get("/info/{tg_id}")
+async def get_user_info(tg_id: str, db: AsyncSession = Depends(get_db)):
+    query = select(User).where(User.telegram_id == tg_id)
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        return {"success": False, "error": "User not found"}
+
+    return {
+        "success": True,
+        "data": {
+            "tg_id": user.telegram_id,
+            "wallet": user.wallet_address,
+            "address": user.usr_adress,
+            "balance": user.internal_balance
+        }
     }
