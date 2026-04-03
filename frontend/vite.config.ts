@@ -11,7 +11,7 @@ export default defineConfig({
     proxy: {
       // Вот это правило перенаправит ВЕСЬ /api на бэкенд!
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: process.env.VITE_FRONTEND_URL || 'https://latonya-viscosimetric-staggeringly.ngrok-free.dev',
         changeOrigin: true,
       },
     }

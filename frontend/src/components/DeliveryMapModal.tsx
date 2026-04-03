@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, X, Target, LoaderCircle } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import * as L from "leaflet";
 import 'leaflet/dist/leaflet.css';
 
 // Чиним дефолтные иконки маркера
@@ -249,9 +249,9 @@ export function DeliveryMapModal({ isOpen, onClose, onConfirm, currentAddress, c
                 >
                 <MapUpdater center={mapCenter} />
                 <TileLayer
-                attribution='&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>...'
-                url={`https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key=${import.meta.env.STADIA_MAPS_API_KEY}`}
-                />
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              />
                 {selectedLocation && <Marker position={selectedLocation} />}
                 {searchedLocation && <Marker position={searchedLocation} icon={redIcon} />}
                 {/* Вставляем наш компонент событий сюда: */}

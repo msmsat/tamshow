@@ -38,7 +38,11 @@ export function OrdersModal({ isOpen, onClose, onGoToCart }: OrdersModalProps) {
       const fetchOrders = async () => {
         setIsLoading(true);
         try {
-          const response = await fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/profile/orders/${tgId}`);
+          const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/orders/${tgId}`, {
+            headers: {
+              "ngrok-skip-browser-warning": "true"
+            }
+          });
           if (!response.ok) throw new Error("Ошибка сети");
           
           const data = await response.json();
@@ -65,9 +69,12 @@ export function OrdersModal({ isOpen, onClose, onGoToCart }: OrdersModalProps) {
     
     setIsCancelling(true);
     try {
-      const response = await fetch(`/api/profile/orders/cancel`, {
+      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/orders/cancel`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          "ngrok-skip-browser-warning": "true" 
+        },
         body: JSON.stringify({ tg_id: tgId, item_id: itemId })
       });
       const data = await response.json();
@@ -103,9 +110,12 @@ export function OrdersModal({ isOpen, onClose, onGoToCart }: OrdersModalProps) {
 
     // 4. Отправляем Питону команду сохранить это в базу данных
     try {
-      await fetch('/api/profile/orders/mark-viewed', { // <-- Изменили URL
+      await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/orders/mark-viewed`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          "ngrok-skip-browser-warning": "true"
+        },
         body: JSON.stringify({ 
           tg_id: tgId, 
           item_id: order.id // <-- Отправляем ID конкретного заказа

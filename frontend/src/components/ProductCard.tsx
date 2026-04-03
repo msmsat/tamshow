@@ -3,15 +3,18 @@ import { motion } from 'framer-motion';
 import { useUserStore } from '../store/useUserStore';
 import { useCartStore } from '../store/useCartStore';
 import type { Product } from '../store/types';
+import { useState } from 'react'; // 🔥 Добавили это
 
 interface ProductCardProps extends Product {
   onClick?: () => void;
 }
 
 export function ProductCard({ id, image, title, price, description, category, onClick }: ProductCardProps) {
+  console.log(`[CARD] 🧱 React начал строить карточку: ${title}`);
   const { isVip } = useUserStore();
   const { addToCart, removeFromCart, isInCart } = useCartStore();
   const inCart = isInCart(id);
+  const [isImgLoaded, setIsImgLoaded] = useState(false); // 🔥 Добавили состояние загрузки
   
   // Расчет финальной цены с VIP скидкой
   const finalPrice = isVip ? Math.round(price * 0.8) : price;
@@ -28,17 +31,25 @@ export function ProductCard({ id, image, title, price, description, category, on
   };
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
       onClick={handleCardClick}
       style={{
+        flex: 1,
+        display: 'flex',              // 🔥 Выравнивание высоты
+        flexDirection: 'column',      // 🔥 Выравнивание высоты
+        height: '100%',               // 🔥 Выравнивание высоты
+        width: '100%',                // 🔥 Выравнивание высоты
         backgroundColor: 'rgba(23, 23, 23, 0.8)',
         border: '1px solid rgba(255, 255, 255, 0.05)',
         borderRadius: '12px',
         overflow: 'hidden',
         cursor: 'pointer',
-        transition: 'all 0.2s'
+        
+        // 🔥 1. ИСПРАВЛЕНИЕ КОНФЛИКТА: Анимируем только цвета, а не "all"
+        transition: 'background-color 0.2s, border-color 0.2s',
+        
+        // 🔥 2. ИСПРАВЛЕНИЕ APPLE SAFARI: Изоляция и маска (БЕЗ translate3d!)
+        isolation: 'isolate',
+        WebkitMaskImage: '-webkit-radial-gradient(white, black)'
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.backgroundColor = 'rgba(23, 23, 23, 1)';
@@ -53,7 +64,8 @@ export function ProductCard({ id, image, title, price, description, category, on
       <div style={{
         width: '100%',
         aspectRatio: '1',
-        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+        backgroundColor: 'rgba(168, 85, 247, 0.05)', // Сделали фон чуть темнее
+        position: 'relative', // 🔥 Обязательно для скелетона
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -61,23 +73,44 @@ export function ProductCard({ id, image, title, price, description, category, on
         color: '#a855f7',
         overflow: 'hidden'
       }}>
+        
+        {/* 🔥 СКЕЛЕТОН-ЛОАДЕР: Пульсирует, пока картинка не скачалась */}
+        {!isImgLoaded && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: 'rgba(168, 85, 247, 0.15)',
+            animation: 'pulse 1.5s infinite' // Используем твою анимацию из index.css
+          }} />
+        )}
+
         {image.startsWith('/') || image.startsWith('http') ? (
           <img 
             src={image} 
             alt={title}
+            onLoad={() => {
+              // 🔥 ЛОГ 2: Браузер физически скачал картинку из интернета (или достал из кэша)
+              console.log(`[CARD] 🖼️ Картинка ПОЛНОСТЬЮ ЗАГРУЖЕНА: ${title}`);
+              setIsImgLoaded(true);
+            }}
             style={{
               width: '100%',
               height: '100%',
-              objectFit: 'cover'
+              objectFit: 'cover',
+              position: 'relative', // 🔥 Чтобы картинка легла поверх скелетона
+              zIndex: 1,
+              opacity: isImgLoaded ? 1 : 0, 
+              transition: 'opacity 0.4s ease-in-out' // Плавное появление после скачивания
             }}
           />
         ) : (
-          image
+          <span style={{ position: 'relative', zIndex: 1 }}>{image}</span>
         )}
       </div>
 
       {/* Информация */}
-      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* 🔥 Заменили height: '100%' на flex: 1, чтобы блок выталкивал цену всегда в самый низ */}
+      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', flex: 1 }}>
         <div style={{ marginBottom: 'auto' }}>
           {/* Категория бейдж */}
           {category && (

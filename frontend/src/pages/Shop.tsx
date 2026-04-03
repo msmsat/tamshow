@@ -4,6 +4,7 @@ import { ProductCard } from '../components/ProductCard';
 import { useUserStore } from '../store/useUserStore';
 import { useUIStore } from '../store/useUIStore';
 import type { Product } from '../store/types';
+import { motion } from 'framer-motion';
 
 type FilterType = 'all' | 'merch' | 'subscription';
 
@@ -20,10 +21,17 @@ export function Shop() {
       if (!tgId) return; 
 
       try {
-        const response = await fetch(`/api/shop/products?telegram_id=${tgId}`);
+        console.log("[SHOP] 📡 1. Отправляем запрос на бэкенд...");
+        const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/shop/products?telegram_id=${tgId}`, {
+          headers: {
+            "ngrok-skip-browser-warning": "true"
+          }
+        });
         
         if (response.ok) {
           const result = await response.json();
+          console.log("[SHOP] 📥 2. Пришел ответ от бэкенда! Количество товаров:", result.data.length);
+          console.log("[SHOP] 📦 Сами данные:", result.data);
           
           // 3. Форматируем то, что пришло с бэка, под твой тип Product
           const formattedProducts: Product[] = result.data.map((item: any) => ({
@@ -37,6 +45,7 @@ export function Shop() {
           }));
 
           // 4. Обновляем состояние
+          console.log("[SHOP] 💾 3. Сохраняем отформатированные товары в стейт React");
           setFeaturedProducts(formattedProducts);
         }
       } catch (error) {
@@ -62,6 +71,7 @@ export function Shop() {
     
     return matchesCategory && matchesSearch;
   });
+  console.log(`[SHOP] 🎨 4. Рендер страницы Shop. Товаров в сетке: ${filteredProducts.length}`);
 
   return (
     <div style={{
@@ -176,19 +186,39 @@ export function Shop() {
 
       {/* Сетка товаров */}
       {filteredProducts.length > 0 ? (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '16px'
-        }}>
+        // 🔥 1. Меняем div на motion.div
+        <motion.div 
+          // 🔥 2. Говорим: когда контейнер появится, начни показывать детей с задержкой 0.05с между ними
+          initial="hidden"
+          animate="visible"
+          variants={{
+            visible: {
+              transition: { staggerChildren: 0.05 }
+            }
+          }}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '16px'
+          }}
+        >
           {filteredProducts.map(product => (
-            <ProductCard 
-              key={product.id} 
-              {...product}
-              onClick={() => selectProduct(product.id)}
-            />
+            // 🔥 3. Оборачиваем карточку в свой motion.div, который реагирует на родителя
+            <motion.div
+              key={product.id}
+              variants={{
+                hidden: { opacity: 0, y: 20 },
+                visible: { opacity: 1, y: 0, transition: { duration: 0.4 } }
+              }}
+              style={{ height: '100%', display: 'flex' }}
+            >
+              <ProductCard 
+                {...product}
+                onClick={() => selectProduct(product.id)}
+              />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       ) : (
         <div style={{
           textAlign: 'center',

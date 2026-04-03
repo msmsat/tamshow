@@ -80,10 +80,11 @@ export function AiChat() {
     try {
       console.log("Стучимся на FastAPI...");
       // Стучимся на ваш FastAPI сервер (адрес поменяете на свой, если нужно)
-      const response = await fetch('https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/ai-chat', {
+      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/ai-chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          "ngrok-skip-browser-warning": "true"
         },
         // Отправляем текст юзера в формате JSON
         body: JSON.stringify({ message: chatHistory }),
@@ -308,7 +309,7 @@ export function AiChat() {
       {/* Input Area */}
       <div style={{
         position: 'fixed',
-        bottom: '64px',
+        bottom: '79px',
         left: '0',
         right: '0',
         padding: '16px 16px 22px 16px',

@@ -32,7 +32,11 @@ export const useUserStore = create<UserState>((set, get) => ({
   const tgId = get().tgId;
   if (!tgId) return;
   try {
-    const response = await fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/profile/info/${tgId}`);
+    const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/info/${tgId}`, {
+      headers: {
+        "ngrok-skip-browser-warning": "true"
+      }
+    });
     const data = await response.json();
     if (data.success) {
       set({ 
@@ -51,9 +55,12 @@ export const useUserStore = create<UserState>((set, get) => ({
 
     try {
       // Замени URL на тот, который мы прописали в profile.py
-      const response = await fetch('https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/profile/update_address', {
+      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/update_address`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          "ngrok-skip-browser-warning": "true"
+        },
         body: JSON.stringify({ tg_id: tgId, address: address })
       });
 
@@ -72,9 +79,12 @@ export const useUserStore = create<UserState>((set, get) => ({
   connectWallet: async (address: string) => {
     const tgId = get().tgId;
     try {
-      const response = await fetch('https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/wallet/connect', {
+      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/wallet/connect`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          "ngrok-skip-browser-warning": "true"
+        },
         body: JSON.stringify({ tg_id: tgId, wallet_address: address })
       });
 
@@ -97,9 +107,12 @@ export const useUserStore = create<UserState>((set, get) => ({
   disconnectWallet: async () => {
     const tgId = get().tgId;
     try {
-      const response = await fetch('/api/wallet/disconnect', {
+      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/wallet/disconnect`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          "ngrok-skip-browser-warning": "true"
+        },
         body: JSON.stringify({ tg_id: tgId })
       });
 
@@ -126,7 +139,11 @@ export const useUserStore = create<UserState>((set, get) => ({
       // Стучимся на бэкенд и передаем ему адрес кошелька
       // Заглушка для теста: жестко передаем id = "123456789". 
       // Потом заменим на реальный ID из Телеграма!
-      const response = await fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/wallet/status?tg_id=${tgId}`);
+      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/wallet/status?tg_id=${tgId}`, {
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        }
+      });
       if (!response.ok) throw new Error("Ошибка бэкенда");
       const data = await response.json();
       
@@ -148,7 +165,11 @@ export const useUserStore = create<UserState>((set, get) => ({
     const tgId = get().tgId;
     if (!tgId) return; // Защита: если ID еще нет, ничего не делаем
     try {
-      const response = await fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/user/status?tg_id=${tgId}`);
+      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/user/status?tg_id=${tgId}`, {
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        }
+      });
       if (!response.ok) throw new Error("Ошибка бэкенда");
       
       // Питон ответил! Записываем то, что он сказал (true или false)

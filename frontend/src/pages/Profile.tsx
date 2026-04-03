@@ -42,7 +42,11 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
 
   const fetchAddress = () => {
     if (!tgId) return;
-    fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/profile/address/${tgId}`)
+    fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/address/${tgId}`, {
+      headers: {
+        "ngrok-skip-browser-warning": "true"
+      }
+    })
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -63,7 +67,11 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
   // 1. ВЫНОСИМ ЗАПРОС В ОТДЕЛЬНУЮ ФУНКЦИЮ
   const checkUnseenOrders = () => {
     if (!tgId) return;
-    fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/profile/orders/unseen/${tgId}`)
+    fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/orders/unseen/${tgId}`, {
+      headers: {
+        "ngrok-skip-browser-warning": "true"
+      }
+    })
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -625,9 +633,12 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
         currentLon={deliveryLon}
         onConfirm={async (address, lat, lon) => {
           try {
-            const response = await fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/profile/update-address`, {
+            const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/update-address`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                "ngrok-skip-browser-warning": "true"
+              },
               body: JSON.stringify({ 
                 tg_id: tgId, 
                 address: address,

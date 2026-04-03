@@ -24,7 +24,11 @@ export function Home({ onTabChange }: { onTabChange?: (tab: string) => void }) {
       // 🛠 ТЕСТОВЫЙ ЗАПРОС ПЕРЕД ОСНОВНЫМ
       try {
         console.log("⏳ Отправляем тестовый PING...");
-        const pingResponse = await fetch('/api/shop/ping');
+        const pingResponse = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/shop/ping`, {
+          headers: {
+            "ngrok-skip-browser-warning": "true"
+          }
+        });
         const pingData = await pingResponse.json();
         console.log("✅ УСПЕХ PING:", pingData);
       } catch (e) {
@@ -33,7 +37,11 @@ export function Home({ onTabChange }: { onTabChange?: (tab: string) => void }) {
 
       console.log("Загружаем продукты для tgId:", tgId); // <-- Логируем, что начинаем загрузку
       try {
-        const response = await fetch(`/api/shop/products?telegram_id=${tgId}&limit=2`);
+        const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/shop/products?telegram_id=${tgId}&limit=2`, {
+          headers: {
+            "ngrok-skip-browser-warning": "true"
+          }
+        });
         console.log("Загружаем продукты для tgId:", tgId); // <-- Логируем, что начинаем загрузку
         console.log("Ответ от API:", response); // <-- Логируем ответ от API
         if (response.ok) {
@@ -110,24 +118,13 @@ export function Home({ onTabChange }: { onTabChange?: (tab: string) => void }) {
           border: '1px solid rgba(255, 255, 255, 0.1)',
           overflow: 'hidden',
           padding: '24px',
-          boxShadow: '0 0 30px -10px rgba(168, 85, 247, 0.3)'
+          boxShadow: '0 0 30px -10px rgba(168, 85, 247, 0.3)',
+          // 🔥 1. ПЕРЕНЕСЛИ ГРАДИЕНТ НАПРЯМУЮ СЮДА:
+          backgroundImage: 'linear-gradient(135deg, rgba(126, 34, 206, 0.3) 0%, rgba(23, 23, 23, 1) 50%, rgba(23, 23, 23, 1) 100%)',
+          // 🔥 2. ИЗОЛИРУЕМ СЛОЙ ДЛЯ SAFARI:
+          isolation: 'isolate'
         }}
       >
-        {/* Фоновый градиент */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundImage: 'linear-gradient(135deg, rgba(126, 34, 206, 0.3) 0%, rgba(23, 23, 23, 1) 50%, rgba(23, 23, 23, 1) 100%)',
-          zIndex: -1
-        }} />
-
-        <div style={{
-          position: 'relative',
-          zIndex: 1
-        }}>
           {walletAddress ? (
             <>
               <h2 style={{
@@ -180,7 +177,6 @@ export function Home({ onTabChange }: { onTabChange?: (tab: string) => void }) {
               </div>
             </>
           )}
-        </div>
       </motion.div>
 
       {/* ========== QUICK ACTIONS ========== */}

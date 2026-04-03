@@ -144,7 +144,9 @@ export default function App() {
         bottom: 0,
         left: 0,
         right: 0,
-        height: '64px',
+        height: '79px', 
+        paddingBottom: '15px', 
+        boxSizing: 'border-box',
         backgroundColor: 'rgba(23, 23, 23, 0.8)', // bg-neutral-900/80
         backdropFilter: 'blur(12px)', // Эффект матового стекла
         WebkitBackdropFilter: 'blur(12px)', // Для Safari

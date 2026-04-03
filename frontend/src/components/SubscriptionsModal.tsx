@@ -32,7 +32,11 @@ export function SubscriptionsModal({ isOpen, onClose, onGoToShop }: Subscription
         setIsLoading(true);
         try {
           // 🔥 Тот самый новый путь
-          const response = await fetch(`/api/shop/subscriptions?telegram_id=${tgId}`);
+          const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/shop/subscriptions?telegram_id=${tgId}`, {
+            headers: {
+              "ngrok-skip-browser-warning": "true"
+            }
+          });
           
           if (!response.ok) throw new Error("Ошибка сети");
           

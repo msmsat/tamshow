@@ -12,12 +12,11 @@ import { X } from 'lucide-react';
 // 🔥 Константа для максимального количества мерча в корзине
 
 export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
-  const { walletAddress } = useUserStore();
+  const { walletAddress, tgId } = useUserStore();
   
   // 1. ДОСТАЕМ fetchCart из стора
   const { cart, removeFromCart, updateQuantity: updateCartQuantity, fetchCart } = useCartStore();
   // 2. ВРЕМЕННО ХАРДКОДИМ ID (позже возьмем из Telegram)
-  const tgId = "620994031"; 
 
   // 3. ДОСТАЕМ ВСЕ ТОВАРЫ (Вам нужно взять их оттуда же, откуда вы их берете в Shop.tsx)
   // Например, если у вас есть useShopStore: const { products } = useShopStore();
@@ -26,9 +25,12 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
 
   // 4. ДОБАВЛЯЕМ МАГИЮ ЗАГРУЗКИ:
   useEffect(() => {
+    // 🔥 ПРОВЕРКА: Если tgId еще null, ничего не делаем
+    if (!tgId) return;
+    
     // При открытии корзины - качаем ее из БД!
     fetchCart(tgId, allProducts);
-  }, []); // Пустые скобки означают "сделать 1 раз при открытии"
+  }, [tgId]);
 
   const handleQuantityChange = (productId: string, delta: number) => {
     const item = cart.find(i => i.id === productId);
@@ -478,12 +480,11 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
 // Sticky Checkout Footer Component
 export function CheckoutFooter() {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { walletAddress } = useUserStore();
+  const { walletAddress, tgId } = useUserStore();
   const { cart, fetchCart } = useCartStore();
   const [showPayQR, setShowPayQR] = useState(false);
   const [depositAddress, setDepositAddress] = useState(''); // Сюда положим адрес от Питона
   const [isFetchingAddress, setIsFetchingAddress] = useState(false); // Статус загрузки
-  const tgId = "620994031"; // Временно хардкодим tgId (как ты делал выше в Cart)
   const [balance, setBalance] = useState<number | null>(null);
   const [canPay, setCanPay] = useState<boolean>(false);
   const [backendTotal, setBackendTotal] = useState<number | null>(null);
@@ -506,7 +507,11 @@ export function CheckoutFooter() {
     
     setIsFetchingAddress(true);
     try {
-      const response = await fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/wallet/get-address?tg_id=${tgId}`);
+      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/wallet/get-address?tg_id=${tgId}`, {
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        }
+      });
       
       if (!response.ok) {
         throw new Error('Network response was not ok');
@@ -532,7 +537,11 @@ export function CheckoutFooter() {
     setIsFetchingAddress(true); 
     
     try {
-      const response = await fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/cart/checkout-preview/${tgId}`);
+      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/cart/checkout-preview/${tgId}`, {
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        }
+      });
       if (!response.ok) throw new Error('Network error');
       
       const data = await response.json();
@@ -564,9 +573,12 @@ export function CheckoutFooter() {
     setIsPaying(true); // Включаем загрузку на кнопке
     
     try {
-      const response = await fetch(`https://latonya-viscosimetric-staggeringly.ngrok-free.dev/api/cart/pay`, {
+      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/cart/pay`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          "ngrok-skip-browser-warning": "true"
+        },
         body: JSON.stringify({ 
           tg_id: tgId, 
           // Отправляем сумму, которую посчитал бэкенд (или локальную, если бэкенд тупит)
@@ -578,6 +590,7 @@ export function CheckoutFooter() {
       
       if (data.success) {
         setIsSuccess(true); 
+        if (!tgId) return;
         fetchCart(tgId, ALL_PRODUCTS); // Берем напрямую из импорта!
       } else {
         alert(`❌ Ошибка оплаты: ${data.error}`);
@@ -608,7 +621,7 @@ export function CheckoutFooter() {
       transition={{ duration: 0.4, ease: "easeInOut" }} // Вот здесь настраивается скорость (0.4 секунды)
       style={{
         position: 'fixed',
-        bottom: '64px',
+        bottom: '79px',
         left: '0',
         right: '0',
         paddingLeft: '16px',
