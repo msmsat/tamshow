@@ -36,6 +36,12 @@ export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 
     open(); 
   };
 
+  const handleOpenInBrowser = () => {
+    if (window.Telegram?.WebApp) {
+      window.Telegram.WebApp.openLink(window.location.href);
+    }
+  };
+
   // 2. ЕДИНСТВЕННЫЙ КОНТРОЛЛЕР (Без дублирования!)
   useEffect(() => {
     const handleWeb3ModalConnection = async () => {
@@ -161,6 +167,22 @@ export function WalletConnect({ color = '#c084fc', borderColor = 'rgba(168, 85, 
           {errorMsg}
         </span>
       )}
+      <button
+        onClick={handleOpenInBrowser}
+        style={{
+          background: 'none',
+          border: 'none',
+          color: '#9ca3af',
+          fontSize: '10px', // Делаем текст мелким, чтобы не отвлекал
+          textDecoration: 'underline',
+          cursor: 'pointer',
+          padding: 0,
+          marginTop: '-4px', // Слегка прижимаем к верхней кнопке
+          textAlign: 'left'
+        }}
+      >
+        Not working? Open in browser
+      </button>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { Send, Bot } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
-import { useUserStore, telegramInitData } from '../store/useUserStore';
+import { telegramInitData } from '../store/useUserStore';
 
 interface Message {
   id: string;

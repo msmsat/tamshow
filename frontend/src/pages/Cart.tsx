@@ -1,7 +1,7 @@
 import { ShoppingBag, ArrowLeft, Minus, Trash2, Plus, Zap, ShieldCheck, ArrowRight, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
-import { useUserStore } from '../store/useUserStore';
+import { useUserStore, telegramInitData } from '../store/useUserStore';
 import { useCartStore } from '../store/useCartStore';
 import { WalletConnect } from '../components/WalletConnect';
 import { ALL_PRODUCTS } from '../store/products'; 
@@ -508,7 +508,8 @@ export function CheckoutFooter() {
     try {
       const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/wallet/get-address`, {
         headers: {
-          "ngrok-skip-browser-warning": "true"
+          "ngrok-skip-browser-warning": "true",
+          "Authorization": `tma ${telegramInitData}` // 🔥 ДОБАВИЛИ ПАСПОРТ
         }
       });
       
@@ -538,7 +539,8 @@ export function CheckoutFooter() {
     try {
       const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/cart/checkout-preview`, {
         headers: {
-          "ngrok-skip-browser-warning": "true"
+          "ngrok-skip-browser-warning": "true",
+          "Authorization": `tma ${telegramInitData}`
         }
       });
       if (!response.ok) throw new Error('Network error');

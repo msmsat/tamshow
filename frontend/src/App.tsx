@@ -8,8 +8,7 @@ import { Cart, CheckoutFooter } from './pages/Cart';
 import { Profile } from './pages/Profile';
 import { useUIStore } from './store/useUIStore';
 import { useCartStore } from './store/useCartStore';
-import { useUserStore } from './store/useUserStore';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 // web3
 import { createWeb3Modal, defaultConfig } from '@web3modal/ethers/react';
@@ -33,16 +32,21 @@ const mainnet = {
 const metadata = {
   name: 'Nexus Store',
   description: 'Cyberpunk Web3 Shop',
-  url: 'https://localhost:5173', // Замените на ваш адрес, если он другой
-  icons: ['https://cdn-icons-png.flaticon.com/512/6001/6001864.png'] // Иконка кибер-магазина
+  url: window.location.origin, // 🔥 Теперь он сам подставит твой ngrok url!
+  icons: ['https://cdn-icons-png.flaticon.com/512/6001/6001864.png']
 }
 
-// 3. Создаем само окно (ВАЖНО: Project ID пока тестовый, позже получим ваш личный)
+// 3. Твой Project ID (используй свой или этот тестовый, но не текст в кавычках!)
+const projectId = '8ef5ab1f5b6392d772cea581cac32f1c';
+
 createWeb3Modal({
   ethersConfig: defaultConfig({ metadata }),
   chains: [mainnet],
-  projectId: '8ef5ab1f5b6392d772cea581cac32f1c', // Это публичный тестовый ID, его хватит для начала
-  enableAnalytics: false
+  projectId,
+  enableAnalytics: true,
+  themeMode: 'dark',
+  // @ts-ignore
+  enableUniversalProvider: true // Тот самый Вариант 3
 });
 
 // Список наших вкладок

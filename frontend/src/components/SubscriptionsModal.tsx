@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, X, ArrowRight, ShieldCheck } from 'lucide-react';
 import { ALL_PRODUCTS } from '../store/products';
-import { useUserStore } from '../store/useUserStore';
+import { useUserStore, telegramInitData } from '../store/useUserStore';
 
 // 🔥 1. Правильно описываем то, что реально присылает Питон
 interface Subscription {
@@ -34,7 +34,8 @@ export function SubscriptionsModal({ isOpen, onClose, onGoToShop }: Subscription
           // 🔥 Тот самый новый путь
           const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/shop/subscriptions`, {
             headers: {
-              "ngrok-skip-browser-warning": "true"
+              "ngrok-skip-browser-warning": "true",
+              "Authorization": `tma ${telegramInitData}`
             }
           });
           

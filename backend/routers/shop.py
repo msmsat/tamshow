@@ -109,7 +109,7 @@ async def get_shop_products(
     }
 
 @router.get("/subscriptions", response_model=dict)
-async def get_active_subscriptions(db: AsyncSession = Depends(get_db), telegram_id: str = Query(..., description="Telegram ID пользователя")):
+async def get_active_subscriptions(db: AsyncSession = Depends(get_db), telegram_id: str = Depends(get_current_user)):
     """
     Возвращает список всех активных подписок пользователя.
     """
