@@ -2,6 +2,7 @@ import { Send, Bot } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
+import { useUserStore, telegramInitData } from '../store/useUserStore';
 
 interface Message {
   id: string;
@@ -84,7 +85,8 @@ export function AiChat() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          "ngrok-skip-browser-warning": "true"
+          "ngrok-skip-browser-warning": "true",
+          'Authorization': `tma ${telegramInitData}`
         },
         // Отправляем текст юзера в формате JSON
         body: JSON.stringify({ message: chatHistory }),

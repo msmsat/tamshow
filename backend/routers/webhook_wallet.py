@@ -1,14 +1,20 @@
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request, Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import json
+import hmac
+import hashlib
+import os
+from dotenv import load_dotenv
 
 # Импортируем базу данных и модель юзера
 from database import get_db
 from models import User
 
-router = APIRouter(tags=["Alchemy Webhook"])
+load_dotenv()
+ALCHEMY_SIGNING_KEY = os.getenv("ALCHEMY_SIGNING_KEY")
 
+router = APIRouter(tags=["Alchemy Webhook"])
 # Стало (добавили prefix):
 router = APIRouter(
     prefix="/api/webhook",
@@ -16,11 +22,37 @@ router = APIRouter(
 )
 
 @router.post("/alchemy")
-async def alchemy_webhook(request: Request, db: AsyncSession = Depends(get_db)):
+async def alchemy_webhook(
+    request: Request, 
+    x_alchemy_signature: str = Header(None), 
+    db: AsyncSession = Depends(get_db)
+):
     """
     Принимает уведомления от Alchemy о транзакциях в блокчейне.
     """
     try:
+        # 1. Читаем СЫРОЕ тело запроса (в байтах) ДО того, как оно станет JSON
+        # Это критически важно: если изменить хоть один пробел, подпись не сойдется
+        raw_body = await request.body()
+
+        # 2. ЗАЩИТА: Проверяем подпись от Alchemy
+        if ALCHEMY_SIGNING_KEY:
+            if not x_alchemy_signature:
+                print("🚨 АТАКА: Отсутствует заголовок x-alchemy-signature!")
+                raise HTTPException(status_code=403, detail="Signature missing")
+
+            # Вычисляем нашу подпись по криптографическому алгоритму HMAC-SHA256
+            expected_signature = hmac.new(
+                ALCHEMY_SIGNING_KEY.encode('utf-8'),
+                raw_body,
+                hashlib.sha256
+            ).hexdigest()
+
+            # Безопасное сравнение подписей (защита от timing attacks)
+            if not hmac.compare_digest(expected_signature, x_alchemy_signature):
+                print("🚨 АТАКА: Неверная подпись вебхука! Кто-то шлет фейковые деньги!")
+                raise HTTPException(status_code=403, detail="Invalid signature")
+
         # 1. Получаем сырые данные от Alchemy
         payload = await request.json()
         

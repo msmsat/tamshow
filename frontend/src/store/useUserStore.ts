@@ -2,44 +2,45 @@ import { create } from 'zustand';
 
 interface UserState {
   // Web3 состояние
-  tgId: string | null; // ID из Телеграма, который мы используем для всех запросов к бэкенду
+  tgId: string | null; // 🔥 1. ВЕРНУЛИ СЮДА
   walletAddress: string | null;
   isVip: boolean;
-  isUser: boolean; // Новое поле для проверки наличия пользователя в базе данных
   shippingAddress: string | null;
   internalBalance: number;
 
   // Действия
-  setTgId: (id: string) => void; // <--- ДОБАВИТЬ ЭТО
   connectWallet: (address: string) => Promise<{success: boolean, error?: string}>;
   disconnectWallet: () => Promise<boolean>;
   checkVipOnBackend: () => Promise<void>;
-  checkUserInDatabase: () => Promise<void>;
   saveShippingAddress: (address: string) => Promise<boolean>;
   fetchUserInfo: () => Promise<void>;
 }
 
-export const useUserStore = create<UserState>((set, get) => ({
-  tgId: null, // Заглушка для теста, потом заменим на реальный ID из Телеграма
+export const telegramInitData = window.Telegram?.WebApp?.initData || "";
+const initialTgId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id 
+  ? String(window.Telegram?.WebApp?.initDataUnsafe?.user?.id)
+  : null;
+
+export const useUserStore = create<UserState>((set) => ({
+  tgId: initialTgId, // 🔥 3. ЗАПИСАЛИ СТАРТОВЫЙ ID
   walletAddress: null,
   isVip: false,
-  isUser: false,
   shippingAddress: null,
   internalBalance: 0,
 
 
   fetchUserInfo: async () => {
-  const tgId = get().tgId;
-  if (!tgId) return;
   try {
-    const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/info/${tgId}`, {
+    const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/info`, {
       headers: {
-        "ngrok-skip-browser-warning": "true"
+        "ngrok-skip-browser-warning": "true",
+        'Authorization': `tma ${telegramInitData}`
       }
     });
     const data = await response.json();
     if (data.success) {
       set({ 
+        tgId: data.data.tg_id,
         internalBalance: data.data.balance,
         walletAddress: data.data.wallet,
         shippingAddress: data.data.address 
@@ -50,18 +51,16 @@ export const useUserStore = create<UserState>((set, get) => ({
   }},
 
   saveShippingAddress: async (address: string) => {
-    const tgId = get().tgId;
-    if (!tgId) return false;
-
     try {
       // Замени URL на тот, который мы прописали в profile.py
       const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/update_address`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          "ngrok-skip-browser-warning": "true"
+          "ngrok-skip-browser-warning": "true",
+          'Authorization': `tma ${telegramInitData}`
         },
-        body: JSON.stringify({ tg_id: tgId, address: address })
+        body: JSON.stringify({address: address })
       });
 
       if (response.ok) {
@@ -77,15 +76,15 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   connectWallet: async (address: string) => {
-    const tgId = get().tgId;
     try {
       const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/wallet/connect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          "ngrok-skip-browser-warning": "true"
+          "ngrok-skip-browser-warning": "true",
+          'Authorization': `tma ${telegramInitData}`
         },
-        body: JSON.stringify({ tg_id: tgId, wallet_address: address })
+        body: JSON.stringify({ wallet_address: address })
       });
 
       const data = await response.json();
@@ -105,15 +104,14 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   disconnectWallet: async () => {
-    const tgId = get().tgId;
     try {
       const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/wallet/disconnect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          "ngrok-skip-browser-warning": "true"
-        },
-        body: JSON.stringify({ tg_id: tgId })
+          "ngrok-skip-browser-warning": "true",
+          'Authorization': `tma ${telegramInitData}`
+        }
       });
 
       const data = await response.json();
@@ -134,14 +132,14 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   checkVipOnBackend: async () => {
     console.log("checkVipOnBackend")
-    const tgId = get().tgId;
     try {
       // Стучимся на бэкенд и передаем ему адрес кошелька
       // Заглушка для теста: жестко передаем id = "123456789". 
       // Потом заменим на реальный ID из Телеграма!
-      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/wallet/status?tg_id=${tgId}`, {
+      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/wallet/status`, {
         headers: {
-          "ngrok-skip-browser-warning": "true"
+          "ngrok-skip-browser-warning": "true",
+          'Authorization': `tma ${telegramInitData}`
         }
       });
       if (!response.ok) throw new Error("Ошибка бэкенда");
@@ -156,30 +154,5 @@ export const useUserStore = create<UserState>((set, get) => ({
       set({ walletAddress: null }); 
     }
   },
-
-  // Добавляем саму функцию:
-  setTgId: (id: string) => set({ tgId: id }),
-
-  checkUserInDatabase: async () => {
-    console.log("checkUserInDatabase")
-    const tgId = get().tgId;
-    if (!tgId) return; // Защита: если ID еще нет, ничего не делаем
-    try {
-      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/user/status?tg_id=${tgId}`, {
-        headers: {
-          "ngrok-skip-browser-warning": "true"
-        }
-      });
-      if (!response.ok) throw new Error("Ошибка бэкенда");
-      
-      // Питон ответил! Записываем то, что он сказал (true или false)
-      set({ isUser: true }); // Если пользователь найден в базе, ставим true
-      
-    } catch (error) {
-      console.error("Бэкенд недоступен, статус пользователя отклонен", error);
-      // Если Питон упал или хакер обрезал интернет - строго даем false
-      set({ isUser: false }); 
-    }
-  }
 
 }))

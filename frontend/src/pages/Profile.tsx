@@ -4,7 +4,7 @@ import {
   Wallet, Copy, Check, Package, Zap, MapPin, Settings, 
   LogOut, Image as ImageIcon, Hexagon, ChevronRight, AlertTriangle 
 } from 'lucide-react';
-import { useUserStore } from '../store/useUserStore';
+import { useUserStore, telegramInitData } from '../store/useUserStore';
 import { useDisconnect, useWeb3Modal, useWeb3ModalAccount } from '@web3modal/ethers/react';
 import { OrdersModal } from '../components/OrdersModal';
 import { SubscriptionsModal } from '../components/SubscriptionsModal';
@@ -42,9 +42,10 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
 
   const fetchAddress = () => {
     if (!tgId) return;
-    fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/address/${tgId}`, {
+    fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/address`, {
       headers: {
-        "ngrok-skip-browser-warning": "true"
+        "ngrok-skip-browser-warning": "true",
+        'Authorization': `tma ${telegramInitData}`
       }
     })
       .then(res => res.json())
@@ -67,9 +68,10 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
   // 1. ВЫНОСИМ ЗАПРОС В ОТДЕЛЬНУЮ ФУНКЦИЮ
   const checkUnseenOrders = () => {
     if (!tgId) return;
-    fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/orders/unseen/${tgId}`, {
+    fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/orders/unseen`, {
       headers: {
-        "ngrok-skip-browser-warning": "true"
+        "ngrok-skip-browser-warning": "true",
+        'Authorization': `tma ${telegramInitData}`
       }
     })
       .then(res => res.json())
@@ -637,7 +639,8 @@ export function Profile({ onTabChange }: { onTabChange?: (tab: string) => void }
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                "ngrok-skip-browser-warning": "true"
+                "ngrok-skip-browser-warning": "true",
+                'Authorization': `tma ${telegramInitData}`
               },
               body: JSON.stringify({ 
                 tg_id: tgId, 

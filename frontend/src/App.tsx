@@ -58,28 +58,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const { selectedProductId, selectProduct } = useUIStore();
   const { cart } = useCartStore();
-  const { setTgId, checkUserInDatabase } = useUserStore();
-
-  // 3. МАГИЯ ИНИЦИАЛИЗАЦИИ
-  useEffect(() => {
-    // Пытаемся достать данные из Telegram Mini App
-    const telegramUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-    
-    // Запасной ID, если открыли просто в браузере (для твоих тестов)
-    let realId = "620994031"; 
-
-    // Если мы реально внутри Телеграма - берем настоящий ID!
-    if (telegramUser && telegramUser.id) {
-      realId = telegramUser.id.toString();
-    }
-
-    // Шаг А: Сначала сохраняем правильный ID в глобальное хранилище
-    setTgId(realId);
-
-    // Шаг Б: Теперь запускаем проверку (хранилище уже знает правильный ID)
-    checkUserInDatabase();
-    
-  }, [setTgId, checkUserInDatabase]); // Сработает ровно один раз при запуске
 
   return (
     // Главный экран: жестко фиксируем 100vh, чтобы не было системного скролла!

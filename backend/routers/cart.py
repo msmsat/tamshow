@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 # Импортируем вашу функцию для БД и новую модель
+from auth import get_current_user
 from database import get_db
 from datetime import datetime, timedelta
 from models import CartItem, User, Product, Order, OrderItem, Subscription
@@ -17,28 +18,21 @@ router = APIRouter(
 # ================= МОДЕЛИ ДАННЫХ =================
 
 class CartAddRequest(BaseModel):
-    tg_id: str
     product_id: str
-    quantity: int = 1
+    quantity: int = Field(default=1, gt=0)
 
 class CartUpdateRequest(BaseModel):
-    tg_id: str
     product_id: str
-    quantity: int
+    quantity: int = Field(gt=0)
 
 class CartRemoveRequest(BaseModel):
-    tg_id: str
     product_id: str
-
-class CheckoutPayRequest(BaseModel):
-    tg_id: str
-    total_amount: float
 
 # ================= ЭНДПОИНТЫ =================
 
 # 1. ПОЛУЧИТЬ КОРЗИНУ ЮЗЕРА
-@router.get("/{tg_id}")
-async def get_cart(tg_id: str, db: AsyncSession = Depends(get_db)):
+@router.get("")
+async def get_cart(db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     # Ищем все товары этого юзера
     query = select(CartItem).where(CartItem.telegram_id == tg_id)
     result = await db.execute(query)
@@ -60,10 +54,10 @@ async def get_cart(tg_id: str, db: AsyncSession = Depends(get_db)):
 
 # 2. ДОБАВИТЬ ТОВАР (или увеличить количество)
 @router.post("/add")
-async def add_to_cart(req: CartAddRequest, db: AsyncSession = Depends(get_db)):
+async def add_to_cart(req: CartAddRequest, db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     # Проверяем, есть ли уже этот товар у юзера
     query = select(CartItem).where(
-        CartItem.telegram_id == req.tg_id,
+        CartItem.telegram_id == tg_id,
         CartItem.product_id == req.product_id
     )
     result = await db.execute(query)
@@ -75,7 +69,7 @@ async def add_to_cart(req: CartAddRequest, db: AsyncSession = Depends(get_db)):
     else:
         # Создаем новую запись
         new_item = CartItem(
-            telegram_id=req.tg_id,
+            telegram_id=tg_id,
             product_id=req.product_id,
             quantity=req.quantity
         )
@@ -86,9 +80,9 @@ async def add_to_cart(req: CartAddRequest, db: AsyncSession = Depends(get_db)):
 
 # 3. ОБНОВИТЬ ТОЧНОЕ КОЛИЧЕСТВО (+ / -)
 @router.post("/update")
-async def update_cart_quantity(req: CartUpdateRequest, db: AsyncSession = Depends(get_db)):
+async def update_cart_quantity(req: CartUpdateRequest, db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     query = select(CartItem).where(
-        CartItem.telegram_id == req.tg_id,
+        CartItem.telegram_id == tg_id,
         CartItem.product_id == req.product_id
     )
     result = await db.execute(query)
@@ -103,9 +97,9 @@ async def update_cart_quantity(req: CartUpdateRequest, db: AsyncSession = Depend
 
 # 4. УДАЛИТЬ ТОВАР СОВСЕМ
 @router.post("/remove")
-async def remove_from_cart(req: CartRemoveRequest, db: AsyncSession = Depends(get_db)):
+async def remove_from_cart(req: CartRemoveRequest, db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     query = select(CartItem).where(
-        CartItem.telegram_id == req.tg_id,
+        CartItem.telegram_id == tg_id,
         CartItem.product_id == req.product_id
     )
     result = await db.execute(query)
@@ -121,8 +115,8 @@ async def remove_from_cart(req: CartRemoveRequest, db: AsyncSession = Depends(ge
 # =======================================================
 # 5. ПРЕДПРОСМОТР БАЛАНСА ПЕРЕД ОПЛАТОЙ
 # =======================================================
-@router.get("/checkout-preview/{tg_id}")
-async def checkout_preview(tg_id: str, db: AsyncSession = Depends(get_db)):
+@router.get("/checkout-preview")
+async def checkout_preview(db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     # 1. Ищем или создаем юзера
     query = select(User).where(User.telegram_id == tg_id)
     result = await db.execute(query)
@@ -177,9 +171,9 @@ async def checkout_preview(tg_id: str, db: AsyncSession = Depends(get_db)):
 # 6. ФИНАЛЬНАЯ ОПЛАТА С БАЛАНСА
 # =======================================================
 @router.post("/pay")
-async def process_payment(req: CheckoutPayRequest, db: AsyncSession = Depends(get_db)):
+async def process_payment(db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     # 1. Ищем юзера
-    query = select(User).where(User.telegram_id == req.tg_id)
+    query = select(User).where(User.telegram_id == tg_id)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 
@@ -189,7 +183,7 @@ async def process_payment(req: CheckoutPayRequest, db: AsyncSession = Depends(ge
     # 2. ДОСТАЕМ КОРЗИНУ И СЧИТАЕМ СУММУ САМИ (Защита от хакеров)
     cart_query = select(CartItem, Product).join(
         Product, CartItem.product_id == Product.shopify_id
-    ).where(CartItem.telegram_id == req.tg_id)
+    ).where(CartItem.telegram_id == tg_id)
     
     cart_result = await db.execute(cart_query)
     items_with_products = cart_result.all()

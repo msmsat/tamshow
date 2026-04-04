@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 # Импортируем подключение к БД и наши модели
+from auth import get_current_user
 from database import get_db
 from models import User, Order, OrderItem, Product, Subscription
 
@@ -32,9 +33,9 @@ async def ping_test():
 
 @router.get("/products", response_model=dict)
 async def get_shop_products(
-    telegram_id: str, 
     limit: Optional[int] = Query(default=None, description="Сколько товаров вернуть (оставь пустым, чтобы вернуть все)"), 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    telegram_id: str = Depends(get_current_user)
 ):
     print(f"⚠️ ⚠️ Получаем товары для пользователя с Telegram ID: {telegram_id} (limit={limit})")
     
@@ -108,7 +109,7 @@ async def get_shop_products(
     }
 
 @router.get("/subscriptions", response_model=dict)
-async def get_active_subscriptions(telegram_id: str, db: AsyncSession = Depends(get_db)):
+async def get_active_subscriptions(db: AsyncSession = Depends(get_db), telegram_id: str = Query(..., description="Telegram ID пользователя")):
     """
     Возвращает список всех активных подписок пользователя.
     """

@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { ShoppingBag, Zap, ChevronRight } from 'lucide-react';
 import { WalletConnect } from '../components/WalletConnect';
 import { ProductCard } from '../components/ProductCard';
-import { useUserStore } from '../store/useUserStore';
+import { useUserStore, telegramInitData } from '../store/useUserStore';
 import { useUIStore } from '../store/useUIStore';
 import type { Product } from '../store/types';
 import { useEffect, useState } from 'react';
@@ -37,9 +37,10 @@ export function Home({ onTabChange }: { onTabChange?: (tab: string) => void }) {
 
       console.log("Загружаем продукты для tgId:", tgId); // <-- Логируем, что начинаем загрузку
       try {
-        const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/shop/products?telegram_id=${tgId}&limit=2`, {
+        const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/shop/products?limit=2`, {
           headers: {
-            "ngrok-skip-browser-warning": "true"
+            "ngrok-skip-browser-warning": "true",
+            "Authorization": `tma ${telegramInitData}`
           }
         });
         console.log("Загружаем продукты для tgId:", tgId); // <-- Логируем, что начинаем загрузку

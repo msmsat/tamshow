@@ -26,10 +26,9 @@ export function Cart({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   // 4. ДОБАВЛЯЕМ МАГИЮ ЗАГРУЗКИ:
   useEffect(() => {
     // 🔥 ПРОВЕРКА: Если tgId еще null, ничего не делаем
-    if (!tgId) return;
     
     // При открытии корзины - качаем ее из БД!
-    fetchCart(tgId, allProducts);
+    fetchCart(allProducts);
   }, [tgId]);
 
   const handleQuantityChange = (productId: string, delta: number) => {
@@ -507,7 +506,7 @@ export function CheckoutFooter() {
     
     setIsFetchingAddress(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/wallet/get-address?tg_id=${tgId}`, {
+      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/wallet/get-address`, {
         headers: {
           "ngrok-skip-browser-warning": "true"
         }
@@ -537,7 +536,7 @@ export function CheckoutFooter() {
     setIsFetchingAddress(true); 
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/cart/checkout-preview/${tgId}`, {
+      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/cart/checkout-preview`, {
         headers: {
           "ngrok-skip-browser-warning": "true"
         }
@@ -579,8 +578,7 @@ export function CheckoutFooter() {
           'Content-Type': 'application/json',
           "ngrok-skip-browser-warning": "true"
         },
-        body: JSON.stringify({ 
-          tg_id: tgId, 
+        body: JSON.stringify({
           // Отправляем сумму, которую посчитал бэкенд (или локальную, если бэкенд тупит)
           total_amount: backendTotal !== null ? backendTotal : total 
         })
@@ -591,7 +589,7 @@ export function CheckoutFooter() {
       if (data.success) {
         setIsSuccess(true); 
         if (!tgId) return;
-        fetchCart(tgId, ALL_PRODUCTS); // Берем напрямую из импорта!
+        fetchCart(ALL_PRODUCTS); // Берем напрямую из импорта!
       } else {
         alert(`❌ Ошибка оплаты: ${data.error}`);
       }

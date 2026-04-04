@@ -1,3 +1,4 @@
+import os
 import subprocess
 import time
 import sys
@@ -14,7 +15,7 @@ def main():
 
     print("\n🌐 Поднимаем мост ngrok...")
     # ВАЖНО: Вставь сюда свой статический домен, который ты получил ранее!
-    ngrok_domain = "latonya-viscosimetric-staggeringly.ngrok-free.dev" 
+    ngrok_domain = os.getenv("VITE_FRONTEND_URL").replace("https://", "").replace("http://", "") 
     
     ngrok_process = subprocess.Popen(
         ["ngrok", "http", f"--domain={ngrok_domain}", "8000"]

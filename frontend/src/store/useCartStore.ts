@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Product, CartItem } from './types';
-import { useUserStore } from './useUserStore';
+import { useUserStore, telegramInitData } from './useUserStore';
 
 interface CartState {
   cart: CartItem[];
@@ -10,7 +10,7 @@ interface CartState {
   isInCart: (productId: string) => boolean;
   updateQuantity: (productId: string, quantity: number) => Promise<void>;
   // Наша новая функция загрузки из БД
-  fetchCart: (tgId: string, allProducts: Product[]) => Promise<void>;
+  fetchCart: (allProducts: Product[]) => Promise<void>;
 }
 
 export const useCartStore = create<CartState>((set, get) => ({
@@ -37,7 +37,8 @@ export const useCartStore = create<CartState>((set, get) => ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          "ngrok-skip-browser-warning": "true"
+          "ngrok-skip-browser-warning": "true",
+          'Authorization': `tma ${telegramInitData}`
         },
         body: JSON.stringify({
           tg_id: currentTgId,            // ID пользователя
@@ -50,11 +51,12 @@ export const useCartStore = create<CartState>((set, get) => ({
       console.error("Ошибка БД:", error);
     }
   },
-  fetchCart: async (tgId: string, allProducts: Product[]) => {
+  fetchCart: async (allProducts: Product[]) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/cart/${tgId}`, {
+      const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/cart`, {
         headers: {
-          "ngrok-skip-browser-warning": "true"
+          "ngrok-skip-browser-warning": "true",
+          'Authorization': `tma ${telegramInitData}`
         }
       });
       if (response.ok) {
@@ -80,11 +82,6 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   removeFromCart: async (productId: string) => {
     // 1. Мгновенно убираем из интерфейса (оптимистичное обновление)
-    const currentTgId = useUserStore.getState().tgId;
-    if (!currentTgId) {
-        console.error("ID пользователя не найден!");
-        return;
-    }
     set(state => ({
       cart: state.cart.filter(item => item.id !== productId)
     }));
@@ -95,10 +92,10 @@ export const useCartStore = create<CartState>((set, get) => ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          "ngrok-skip-browser-warning": "true"
+          "ngrok-skip-browser-warning": "true",
+          'Authorization': `tma ${telegramInitData}`
         },
         body: JSON.stringify({
-          tg_id: currentTgId,
           product_id: productId
         })
       });
@@ -115,11 +112,6 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   updateQuantity: async (productId: string, quantity: number) => {
     // 1. Мгновенно обновляем цифру на экране (UI)
-    const currentTgId = useUserStore.getState().tgId;
-    if (!currentTgId) {
-        console.error("ID пользователя не найден!");
-        return;
-    }
     set(state => ({
       cart: state.cart.map(item =>
         item.id === productId
@@ -134,10 +126,10 @@ export const useCartStore = create<CartState>((set, get) => ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          "ngrok-skip-browser-warning": "true"
+          "ngrok-skip-browser-warning": "true",
+          'Authorization': `tma ${telegramInitData}`
         },
         body: JSON.stringify({
-          tg_id: currentTgId,
           product_id: productId,
           quantity: quantity // Отправляем итоговую цифру
         })

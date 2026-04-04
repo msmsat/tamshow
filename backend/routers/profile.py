@@ -5,6 +5,7 @@ from sqlalchemy import update, desc, asc
 from pydantic import BaseModel # 🔥 Добавили это
 
 # Импортируем подключение к БД и наши модели
+from auth import get_current_user
 from database import get_db
 from models import User, Order, OrderItem, Product
 
@@ -14,31 +15,23 @@ class OrderViewedRequest(BaseModel):
     is_viewed: bool
 
 class MarkViewedRequest(BaseModel):
-    tg_id: str
     item_id: int
 
 class CancelOrderRequest(BaseModel):
-    tg_id: str
     item_id: int
 
 class UpdateAddressRequest(BaseModel):
-    tg_id: str
     address: str
     lat: float | None = None
     lon: float | None = None
-
-# 1. Схема для получения данных от фронтенда
-class UpdateWalletRequest(BaseModel):
-    telegram_id: str
-    wallet_address: str
 
 router = APIRouter(
     prefix="/api/profile",
     tags=["Profile"]
 )
 
-@router.get("/orders/{tg_id}")
-async def get_active_orders(tg_id: str, db: AsyncSession = Depends(get_db)):
+@router.get("/orders")
+async def get_active_orders(db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     # 1. Сначала находим самого юзера по его Telegram ID
     user_query = select(User).where(User.telegram_id == tg_id)
     user_result = await db.execute(user_query)
@@ -85,34 +78,8 @@ async def get_active_orders(tg_id: str, db: AsyncSession = Depends(get_db)):
         "orders": active_orders
     }
 
-# 3. НОВЫЙ ЭНДПОИНТ: Принудительно меняем статус is_viewed (True / False)
-@router.post("/orders/set-viewed")
-async def set_orders_viewed_status(req: OrderViewedRequest, db: AsyncSession = Depends(get_db)):
-    # 1. Ищем юзера по tg_id
-    user_query = select(User).where(User.telegram_id == req.tg_id)
-    user = (await db.execute(user_query)).scalar_one_or_none()
-
-    if not user:
-        return {"success": False, "error": "Пользователь не найден"}
-
-    # 2. Обновляем флажок is_viewed у ВСЕХ заказов этого юзера 
-    # на то значение, которое прислал React (req.is_viewed)
-    update_query = (
-        update(Order)
-        .where(Order.user_id == user.id)
-        .values(is_viewed=req.is_viewed)
-    )
-    
-    await db.execute(update_query)
-    await db.commit()
-
-    return {
-        "success": True, 
-        "message": f"Статус всех заказов изменен на is_viewed={req.is_viewed}"
-    }
-
-@router.get("/orders/unseen/{tg_id}")
-async def check_unseen_items(tg_id: str, db: AsyncSession = Depends(get_db)):
+@router.get("/orders/unseen")
+async def check_unseen_items(db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     # 1. Находим юзера
     user_query = select(User).where(User.telegram_id == tg_id)
     user = (await db.execute(user_query)).scalar_one_or_none()
@@ -145,9 +112,9 @@ async def check_unseen_items(tg_id: str, db: AsyncSession = Depends(get_db)):
 
 # ЭНДПОИНТ: Меняем статус конкретного заказа на просмотренный
 @router.post("/orders/mark-viewed")
-async def mark_order_viewed(req: MarkViewedRequest, db: AsyncSession = Depends(get_db)):
+async def mark_order_viewed(req: MarkViewedRequest, db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     # 1. Ищем позицию в заказе
-    query = select(OrderItem).where(OrderItem.id == req.item_id)
+    query = select(OrderItem).where(OrderItem.id == req.item_id, User.telegram_id == tg_id)
     item = (await db.execute(query)).scalar_one_or_none()
     
     if item:
@@ -164,9 +131,9 @@ async def mark_order_viewed(req: MarkViewedRequest, db: AsyncSession = Depends(g
 
 # ЭНДПОИНТ: Отмена заказа и возврат средств
 @router.post("/orders/cancel")
-async def cancel_order(req: CancelOrderRequest, db: AsyncSession = Depends(get_db)):
+async def cancel_order(req: CancelOrderRequest, db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     # 1. Ищем юзера по TG ID
-    user_query = select(User).where(User.telegram_id == req.tg_id)
+    user_query = select(User).where(User.telegram_id == tg_id)
     user = (await db.execute(user_query)).scalar_one_or_none()
 
     if not user:
@@ -199,9 +166,9 @@ async def cancel_order(req: CancelOrderRequest, db: AsyncSession = Depends(get_d
     }
 
 @router.post("/update-address")
-async def update_user_address(req: UpdateAddressRequest, db: AsyncSession = Depends(get_db)):
+async def update_user_address(req: UpdateAddressRequest, db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     # Ищем пользователя
-    query = select(User).where(User.telegram_id == req.tg_id)
+    query = select(User).where(User.telegram_id == tg_id)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 
@@ -216,32 +183,8 @@ async def update_user_address(req: UpdateAddressRequest, db: AsyncSession = Depe
 
     return {"success": True, "message": "Address and coordinates updated successfully"}
 
-# 2. Сам эндпоинт для сохранения адреса
-@router.post("/update_wallet")
-async def update_wallet(
-    data: UpdateWalletRequest, 
-    db: AsyncSession = Depends(get_db)
-):
-    # Ищем пользователя по telegram_id
-    query = select(User).where(User.telegram_id == data.telegram_id)
-    result = await db.execute(query)
-    user = result.scalar_one_or_none()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
-
-    # Обновляем адрес кошелька
-    user.wallet_address = data.wallet_address
-    await db.commit()
-
-    return {
-        "status": "success", 
-        "message": "Адрес успешно обновлен", 
-        "wallet_address": user.wallet_address
-    }
-
-@router.get("/address/{tg_id}")
-async def get_address(tg_id: str, db: AsyncSession = Depends(get_db)):
+@router.get("/address")
+async def get_address(db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     query = select(User).where(User.telegram_id == tg_id)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
@@ -254,8 +197,8 @@ async def get_address(tg_id: str, db: AsyncSession = Depends(get_db)):
         "lon": user.usr_lon
     }
 
-@router.get("/info/{tg_id}")
-async def get_user_info(tg_id: str, db: AsyncSession = Depends(get_db)):
+@router.get("/info")
+async def get_user_info(db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     query = select(User).where(User.telegram_id == tg_id)
     result = await db.execute(query)
     user = result.scalar_one_or_none()

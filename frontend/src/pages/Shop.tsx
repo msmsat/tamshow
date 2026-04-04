@@ -1,7 +1,7 @@
 import { Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ProductCard } from '../components/ProductCard';
-import { useUserStore } from '../store/useUserStore';
+import { useUserStore, telegramInitData } from '../store/useUserStore';
 import { useUIStore } from '../store/useUIStore';
 import type { Product } from '../store/types';
 import { motion } from 'framer-motion';
@@ -22,9 +22,10 @@ export function Shop() {
 
       try {
         console.log("[SHOP] 📡 1. Отправляем запрос на бэкенд...");
-        const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/shop/products?telegram_id=${tgId}`, {
+        const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/shop/products`, {
           headers: {
-            "ngrok-skip-browser-warning": "true"
+            "ngrok-skip-browser-warning": "true",
+            'Authorization': `tma ${telegramInitData}`
           }
         });
         

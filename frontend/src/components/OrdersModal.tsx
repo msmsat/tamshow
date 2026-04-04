@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'; // 🔥 ВОТ ЭТОТ ИМПОРТ РЕШАЕТ ПРОБЛЕМУ БЕЛОГО ЭКРАНА!
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, X, ShoppingBag, ArrowRight, Truck, AlertTriangle, ArrowLeft } from 'lucide-react';
-import { useUserStore } from '../store/useUserStore';
+import { useUserStore, telegramInitData } from '../store/useUserStore';
 import { ALL_PRODUCTS } from '../store/products';
 
 // Описываем, как выглядит заказ
@@ -38,9 +38,10 @@ export function OrdersModal({ isOpen, onClose, onGoToCart }: OrdersModalProps) {
       const fetchOrders = async () => {
         setIsLoading(true);
         try {
-          const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/orders/${tgId}`, {
+          const response = await fetch(`${import.meta.env.VITE_FRONTEND_URL}/api/profile/orders`, {
             headers: {
-              "ngrok-skip-browser-warning": "true"
+              "ngrok-skip-browser-warning": "true",
+              'Authorization': `tma ${telegramInitData}`
             }
           });
           if (!response.ok) throw new Error("Ошибка сети");
@@ -73,9 +74,10 @@ export function OrdersModal({ isOpen, onClose, onGoToCart }: OrdersModalProps) {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          "ngrok-skip-browser-warning": "true" 
+          "ngrok-skip-browser-warning": "true",
+          'Authorization': `tma ${telegramInitData}`
         },
-        body: JSON.stringify({ tg_id: tgId, item_id: itemId })
+        body: JSON.stringify({ item_id: itemId })
       });
       const data = await response.json();
       
@@ -114,10 +116,10 @@ export function OrdersModal({ isOpen, onClose, onGoToCart }: OrdersModalProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          "ngrok-skip-browser-warning": "true"
+          "ngrok-skip-browser-warning": "true",
+          'Authorization': `tma ${telegramInitData}`
         },
-        body: JSON.stringify({ 
-          tg_id: tgId, 
+        body: JSON.stringify({
           item_id: order.id // <-- Отправляем ID конкретного заказа
         })
       });

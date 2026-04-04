@@ -6,6 +6,7 @@ from sqlalchemy import select
 import asyncio
 
 # Импортируем нашу базу данных и модель юзера
+from auth import get_current_user
 from database import get_db
 from models import User
 
@@ -34,7 +35,7 @@ router = APIRouter(
 # ==========================================
 # 🌐 НАСТРОЙКИ БЛОКЧЕЙНА (Web3)
 # ==========================================
-RPC_URL = "https://polygon-mainnet.g.alchemy.com/v2/jgw2lV_0VEtHRbO0ZoRpe" 
+RPC_URL = os.getenv("ALCHEMY_RPC_URL")
 w3 = Web3(Web3.HTTPProvider(RPC_URL))
 # 1. Тот самый минимальный словарь, чтобы Питон знал слово "balanceOf"
 MINIMAL_ABI = [{"constant": True, "inputs": [{"name": "_owner", "type": "address"}], "name": "balanceOf", "outputs": [{"name": "balance", "type": "uint256"}], "type": "function"}]
@@ -163,7 +164,11 @@ async def periodic_audit_task():
 # 1. ПРОВЕРКА СТАТУСА (Тихая регистрация)
 # Обратите внимание: путь просто "/status", в итоге получится "/api/wallet/status"
 @router.get("/status")
-async def check_wallet_status(tg_id: str, db: AsyncSession = Depends(get_db)):
+async def check_wallet_status(
+    # tg_id: str, <-- Старый небезопасный параметр УДАЛЯЕМ
+    tg_id: str = Depends(get_current_user), # 🔥 Ставим охранника!
+    db: AsyncSession = Depends(get_db)
+):
     print(f"🔍 Проверяем статус кошелька для TG ID: {tg_id}")
     if not tg_id:
         return {"is_connected": False, "wallet_address": None}
@@ -194,15 +199,14 @@ async def check_wallet_status(tg_id: str, db: AsyncSession = Depends(get_db)):
 
 # 2. ПРИВЯЗКА НОВОГО КОШЕЛЬКА
 class WalletConnectRequest(BaseModel):
-    tg_id: str
     wallet_address: str
 
 # Обратите внимание: путь просто "/connect", потому что префикс "/api/wallet" добавится сам!
 @router.post("/connect")
-async def connect_wallet(req: WalletConnectRequest, db: AsyncSession = Depends(get_db)):
+async def connect_wallet(req: WalletConnectRequest, db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     print("=" * 40)
     print("🔗 ПРОВЕРКА USDC ПЕРЕД ПРИВЯЗКОЙ")
-    print(f"👤 TG ID : {req.tg_id}")
+    print(f"👤 TG ID : {tg_id}")
     print(f"👛 Адрес : {req.wallet_address}")
     
     try:
@@ -229,7 +233,7 @@ async def connect_wallet(req: WalletConnectRequest, db: AsyncSession = Depends(g
             
             # --- НАЧАЛО БЛОКА БАЗЫ ДАННЫХ ---
             # Ищем юзера по его Telegram ID
-            query = select(User).where(User.telegram_id == req.tg_id)
+            query = select(User).where(User.telegram_id == tg_id)
             result = await db.execute(query)
             user = result.scalar_one_or_none()
 
@@ -243,7 +247,7 @@ async def connect_wallet(req: WalletConnectRequest, db: AsyncSession = Depends(g
 
             # Сохраняем (коммитим) изменения в PostgreSQL!
             await db.commit()
-            print(f"💾 Успех! Кошелек {req.wallet_address} навсегда привязан к {req.tg_id}")
+            print(f"💾 Успех! Кошелек {req.wallet_address} навсегда привязан к {tg_id}")
             # --- КОНЕЦ БЛОКА БАЗЫ ДАННЫХ ---
 
             return {
@@ -259,30 +263,25 @@ async def connect_wallet(req: WalletConnectRequest, db: AsyncSession = Depends(g
         print(f"⚠️ Ошибка связи с блокчейном: {e}")
         return {"success": False, "error": "Ошибка при проверке баланса в блокчейне"}
 
-
-# Форма приема для отключения (нам нужен только ID)
-class WalletDisconnectRequest(BaseModel):
-    tg_id: str
-
 @router.post("/disconnect")
-async def disconnect_wallet(req: WalletDisconnectRequest, db: AsyncSession = Depends(get_db)):
-    print(f"🔌 Поступил запрос на отключение кошелька от TG ID: {req.tg_id}")
+async def disconnect_wallet(db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
+    print(f"🔌 Поступил запрос на отключение кошелька от TG ID: {tg_id}")
     
     try:
         # Ищем юзера
-        query = select(User).where(User.telegram_id == req.tg_id)
+        query = select(User).where(User.telegram_id == tg_id)
         result = await db.execute(query)
         user = result.scalar_one_or_none()
 
         if user:
             # Если юзер найден — СТИРАЕМ АДРЕС! (Присваиваем None)
             user.wallet_address = None
-            print(f"✅ Кошелек успешно удален из БД для юзера {req.tg_id}")
+            print(f"✅ Кошелек успешно удален из БД для юзера {tg_id}")
         else:
             # Если юзера вдруг не оказалось в базе — создаем его (только по tg_id)
-            new_user = User(telegram_id=req.tg_id)
+            new_user = User(telegram_id=tg_id)
             db.add(new_user)
-            print(f"🆕 Пользователь {req.tg_id} не найден. Создали нового (без кошелька)!")
+            print(f"🆕 Пользователь {tg_id} не найден. Создали нового (без кошелька)!")
 
         # Вызываем commit() один раз для обоих случаев, чтобы сохранить изменения
         await db.commit()
@@ -294,7 +293,7 @@ async def disconnect_wallet(req: WalletDisconnectRequest, db: AsyncSession = Dep
         return {"success": False, "error": str(e)}
 
 @router.get("/get-address")
-async def get_deposit_address(tg_id: str, db: AsyncSession = Depends(get_db)):
+async def get_deposit_address(db: AsyncSession = Depends(get_db), tg_id: str = Depends(get_current_user)):
     print(f"🔥 [БЭКЕНД] Пришел запрос от фронтенда!")
     print(f"👀 Ищем Polygon-адрес для юзера: {tg_id}")
     
